@@ -1,0 +1,36 @@
+{
+  "name": "autoflow-cli",
+  "version": "1.0.0",
+  "description": "Automated CI/CD CLI tool for students and beginners",
+  "main": "bin/index.js",
+  "bin": {
+    "autoflow": "./bin/index.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node bin/index.js"
+  },
+  "keywords": [
+    "cli",
+    "deployment",
+    "automation",
+    "devops",
+    "docker",
+    "ssh"
+  ],
+  "author": "",
+  "license": "MIT",
+  "files": [
+    "bin",
+    "src"
+  ],
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "commander": "^14.0.2",
+    "figlet": "^1.9.4",
+    "inquirer": "^8.2.5",
+    "node-ssh": "^13.2.1",
+    "shelljs": "^0.10.0",
+    "simple-git": "^3.30.0"
+  }
+}
