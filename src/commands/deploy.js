@@ -1,8 +1,51 @@
 const log = require('../utils/logger');
+const chalk = require('chalk');
 const fs = require('fs');
 const path = require('path');
 const { NodeSSH } = require('node-ssh');
 const simpleGit = require('simple-git');
+
+// Helper to execute command and check for errors
+async function exec(ssh, command, log) {
+    const result = await ssh.execCommand(command);
+    if (result.code !== 0) {
+        log.error(`Command failed: ${command}`);
+        console.log(chalk.red(result.stdout)); // Docker build errors often go to stdout
+        console.log(chalk.red(result.stderr));
+        throw new Error('Remote command failed');
+    }
+    return result;
+}
+
+// Helper to ensure server has Swap space (prevents OOM builds)
+async function ensureSwap(ssh, log) {
+    try {
+        const check = await ssh.execCommand('free -m');
+        const lines = check.stdout.split('\n');
+        const swapLine = lines.find(l => l.includes('Swap:'));
+
+        if (swapLine) {
+            const parts = swapLine.split(/\s+/);
+            const swapTotal = parseInt(parts[1], 10);
+
+            if (swapTotal === 0) {
+                log.warning('⚠️ No Swap detected. Creating 1GB Swap file to prevent build crashes...');
+                await exec(ssh, `
+sudo fallocate -l 1G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=1024
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+`, log);
+                log.success('Swap created successfully ✅');
+            } else {
+                log.info(`Swap check passed: ${swapTotal}MB available`);
+            }
+        }
+    } catch (e) {
+        log.warning('Failed to check/create swap (non-critical)');
+    }
+}
 
 async function deploy() {
     const configPath = path.join(process.cwd(), 'autoflow.config.json');
@@ -42,60 +85,84 @@ async function deploy() {
         });
         log.success('SSH connected');
 
-        /* =====================================================
-           HARD PORT CHECK
-        ===================================================== */
-        const portCheck = await ssh.execCommand(`
-      docker ps --format "{{.Ports}}" | grep -w "${config.appPort}->" || true
-    `);
-
-        if (portCheck.stdout.trim()) {
-            log.error(`Port ${config.appPort} already in use ❌`);
-            ssh.dispose();
-            return;
-        }
+        // Ensure Swap for small servers
+        await ensureSwap(ssh, log);
 
         const projectDir = `/home/${config.sshUser}/apps/${config.projectName}`;
         const image = `${config.projectName}:latest`;
         const container = config.projectName;
 
         /* =====================================================
+           PORT CHECK (ONLY FOR PORT MODE)
+        ===================================================== */
+        if (!config.domain) {
+            const portCheck = await ssh.execCommand(`
+docker ps --format "{{.Ports}}" | grep -w "${config.appPort}->" || true
+`);
+            if (portCheck.stdout.trim()) {
+                log.error(`Port ${config.appPort} already in use ❌`);
+                ssh.dispose();
+                return;
+            }
+        }
+
+        /* =====================================================
            SYNC SERVER CODE
         ===================================================== */
-        await ssh.execCommand(`
-      mkdir -p ${projectDir} &&
-      cd ${projectDir} &&
-      git init &&
-      git remote remove origin || true &&
-      git remote add origin ${config.gitRepo} &&
-      git fetch origin &&
-      git reset --hard origin/main &&
-      git clean -fd
-    `);
+        await exec(ssh, `
+mkdir -p ${projectDir} &&
+cd ${projectDir} &&
+git init &&
+git remote remove origin || true &&
+git remote add origin ${config.gitRepo} &&
+git fetch origin &&
+git reset --hard origin/main &&
+git clean -fd
+`, log);
 
         /* =====================================================
            BUILD IMAGE
         ===================================================== */
-        await ssh.execCommand(`
-      cd ${projectDir} &&
-      docker build --no-cache -t ${image} .
-    `);
+        log.info('Building Docker image...');
+        await exec(ssh, `
+cd ${projectDir} &&
+docker build --no-cache --progress=plain -t ${image} .
+`, log);
 
         /* =====================================================
-           RUN CONTAINER
+           RUN CONTAINER (STRICT MODE)
         ===================================================== */
         await ssh.execCommand(`docker rm -f ${container} || true`);
 
-        await ssh.execCommand(`
-      docker run -d \
-      --restart unless-stopped \
-      -p ${config.appPort}:80 \
-      --name ${container} \
-      ${image}
-    `);
+        const containerPort = config.deploymentType === 'static' ? 80 : config.appPort;
+        log.info(`Mapping: Host:${config.appPort} -> Container:${containerPort}`);
+
+        const portBinding = config.domain
+            ? `-p 127.0.0.1:${config.appPort}:${containerPort}`
+            : `-p ${config.appPort}:${containerPort}`;
+
+        log.info('Starting container...');
+        await exec(ssh, `
+docker run -d \
+--restart unless-stopped \
+${portBinding} \
+--name ${container} \
+${image}
+`, log);
+
+        // Verify container is running
+        const ps = await ssh.execCommand(`docker ps --filter "name=${container}" --format "{{.Status}}"`);
+        if (!ps.stdout || !ps.stdout.includes('Up')) {
+            log.error('Container failed to start. Fetching logs...');
+            const logs = await ssh.execCommand(`docker logs --tail 20 ${container}`);
+            console.log(chalk.red('=== CONTAINER LOGS ==='));
+            console.log(chalk.red(logs.stdout || logs.stderr));
+            console.log(chalk.red('======================'));
+            throw new Error('Container exited immediately.');
+        }
 
         /* =====================================================
-           AUTO NGINX DOMAIN SETUP
+           DOMAIN MODE: NGINX + SSL
         ===================================================== */
         if (config.domain) {
             log.info(`Configuring nginx for ${config.domain}`);
@@ -116,17 +183,79 @@ server {
 
             const confPath = `/etc/nginx/sites-available/${config.projectName}`;
 
+            // Remove conflicting configs
+            log.info('Checking for conflicting Nginx configs...');
+            const conflictCheck = await ssh.execCommand(`grep -l "${config.domain}" /etc/nginx/sites-enabled/*`);
+            if (conflictCheck.stdout) {
+                const conflicts = conflictCheck.stdout.trim().split('\n');
+                for (const conflict of conflicts) {
+                    // Don't remove if it matches current project name (we overwrite it anyway)
+                    // But if it's different (e.g. test-autoflow vs test3), REMOVE IT
+                    const conflictName = path.basename(conflict);
+                    if (conflictName !== config.projectName) {
+                        log.warning(`Removing conflicting config: ${conflictName}`);
+                        await exec(ssh, `sudo rm -f ${conflict}`, log);
+                        await exec(ssh, `sudo rm -f /etc/nginx/sites-available/${conflictName}`, log);
+                    }
+                }
+            }
+
+            await exec(ssh, `
+echo '${nginxConf.replace(/'/g, `'\\''`)}' | sudo tee ${confPath} > /dev/null
+sudo ln -sf ${confPath} /etc/nginx/sites-enabled/${config.projectName}
+sudo nginx -t
+`, log);
+
+            // Reload only if test passed (Use RESTART to be safe)
+            await exec(ssh, `sudo systemctl restart nginx`, log);
+
+            // Verify what is written
+            log.info('Verifying Nginx config content...');
+            const grepCheck = await exec(ssh, `cat ${confPath} | grep proxy_pass`, log);
+            console.log(chalk.yellow('Current Config on Server: ' + grepCheck.stdout.trim()));
+
+
+
+            /* =====================================================
+               AUTO SSL (SAFE)
+            ===================================================== */
+            log.info('Ensuring SSL...');
             await ssh.execCommand(`
-        echo '${nginxConf.replace(/'/g, `'\\''`)}' | sudo tee ${confPath} > /dev/null
-      `);
+sudo certbot --nginx -d ${config.domain} \
+--non-interactive --agree-tos -m admin@${config.domain.split('.').slice(-2).join('.')} || true
+`);
 
-            await ssh.execCommand(`
-        sudo ln -sf ${confPath} /etc/nginx/sites-enabled/${config.projectName}
-      `);
+            log.success(`Live at: https://${config.domain}`);
+        } else {
+            log.success(`Live at: http://${config.serverIp}:${config.appPort}`);
+        }
 
-            await ssh.execCommand(`sudo nginx -t && sudo systemctl reload nginx`);
+        /* =====================================================
+           DIAGNOSTICS (DEBUGGING 502)
+        ===================================================== */
+        log.info('Running post-deploy diagnostics...');
+        try {
+            const diagInfo = await ssh.execCommand(`
+echo "=== DOCKER PS ==="
+docker ps --filter "name=${container}"
+echo "\n=== PORT LISTEN CHECK ==="
+sudo netstat -tuln | grep :${config.appPort} || echo "Port ${config.appPort} not listening"
+echo "\n=== INTERNAL CURL TEST ==="
+curl -v http://127.0.0.1:${config.appPort} --max-time 2 2>&1 || echo "Curl failed"
+echo "\n=== NGINX ERROR LOGS ==="
+sudo tail -n 20 /var/log/nginx/error.log
+`);
+            console.log(chalk.gray(diagInfo.stdout));
 
-            log.success(`Domain ${config.domain} is live 🚀`);
+            if (diagInfo.stdout.includes('Refused') || diagInfo.stdout.includes('Curl failed')) {
+                log.warning('⚠️ INTERNAL CONNECTIVITY CHECK FAILED. Fetching container logs...');
+                const logs = await ssh.execCommand(`docker logs --tail 20 ${container}`);
+                console.log(chalk.red(logs.stdout || logs.stderr));
+            } else {
+                log.success('Internal connectivity test passed ✅');
+            }
+        } catch (e) {
+            log.warning('Diagnostics failed to run');
         }
 
         log.success('DEPLOYMENT COMPLETE 🚀');
