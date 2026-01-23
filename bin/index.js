@@ -9,6 +9,7 @@ const init = require('../src/commands/init');
 const deploy = require('../src/commands/deploy');
 const status = require('../src/commands/status');
 const stop = require('../src/commands/stop');
+const setup = require('../src/commands/setup');
 
 const program = new Command();
 
@@ -23,6 +24,12 @@ program
     .name('autoflow')
     .description('Automated CI/CD CLI tool for students')
     .version('1.0.0');
+
+// Command: setup
+program
+    .command('setup')
+    .description('Configure global server details securely')
+    .action(setup);
 
 // Command: init
 program

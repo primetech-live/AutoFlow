@@ -14,15 +14,26 @@ async function exec(ssh, command, log) {
     return result;
 }
 
+const os = require('os');
+
 async function stop(cmdObj) {
     const configPath = path.join(process.cwd(), 'autoflow.config.json');
+    const globalConfigPath = path.join(os.homedir(), '.autoflow', 'config.json');
 
     if (!fs.existsSync(configPath)) {
         log.error('Run "autoflow init" first.');
         return;
     }
 
-    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    if (!fs.existsSync(globalConfigPath)) {
+        log.error('Global configuration missing! Run "autoflow setup" first.');
+        return;
+    }
+
+    const projectConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    const globalConfig = JSON.parse(fs.readFileSync(globalConfigPath, 'utf-8'));
+    const config = { ...globalConfig, ...projectConfig };
+
     const ssh = new NodeSSH();
 
     log.header(`STOPPING SERVICE: ${config.projectName.toUpperCase()}`);

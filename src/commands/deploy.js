@@ -47,15 +47,28 @@ echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
     }
 }
 
+const os = require('os');
+
 async function deploy() {
     const configPath = path.join(process.cwd(), 'autoflow.config.json');
+    const globalConfigPath = path.join(os.homedir(), '.autoflow', 'config.json');
 
     if (!fs.existsSync(configPath)) {
         log.error('Run "autoflow init" first.');
         return;
     }
 
-    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    if (!fs.existsSync(globalConfigPath)) {
+        log.error('Global configuration missing! Run "autoflow setup" first.');
+        return;
+    }
+
+    const projectConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    const globalConfig = JSON.parse(fs.readFileSync(globalConfigPath, 'utf-8'));
+
+    // Merge configs: Project takes precedence for project-specifics (like appPort), Global for server access
+    const config = { ...globalConfig, ...projectConfig };
+
     const ssh = new NodeSSH();
     const git = simpleGit();
 
@@ -209,11 +222,6 @@ sudo nginx -t
             // Reload only if test passed (Use RESTART to be safe)
             await exec(ssh, `sudo systemctl restart nginx`, log);
 
-            // Verify what is written
-            log.info('Verifying Nginx config content...');
-            const grepCheck = await exec(ssh, `cat ${confPath} | grep proxy_pass`, log);
-            console.log(chalk.yellow('Current Config on Server: ' + grepCheck.stdout.trim()));
-
 
 
             /* =====================================================
@@ -245,10 +253,9 @@ curl -v http://127.0.0.1:${config.appPort} --max-time 2 2>&1 || echo "Curl faile
 echo "\n=== NGINX ERROR LOGS ==="
 sudo tail -n 20 /var/log/nginx/error.log
 `);
-            console.log(chalk.gray(diagInfo.stdout));
-
             if (diagInfo.stdout.includes('Refused') || diagInfo.stdout.includes('Curl failed')) {
                 log.warning('⚠️ INTERNAL CONNECTIVITY CHECK FAILED. Fetching container logs...');
+                console.log(chalk.gray(diagInfo.stdout)); // Show diagnostics only on failure
                 const logs = await ssh.execCommand(`docker logs --tail 20 ${container}`);
                 console.log(chalk.red(logs.stdout || logs.stderr));
             } else {

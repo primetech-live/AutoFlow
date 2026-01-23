@@ -3,12 +3,24 @@ const inquirer = require('inquirer');
 const fs = require('fs');
 const path = require('path');
 const { NodeSSH } = require('node-ssh');
+const os = require('os');
 
 async function init() {
     log.header('AUTOFLOW INITIALIZATION');
 
+    // Check for global config
+    const globalConfigPath = path.join(os.homedir(), '.autoflow', 'config.json');
+    if (!fs.existsSync(globalConfigPath)) {
+        log.error('Global configuration missing!');
+        log.warning('Please run "autoflow setup" first to configure your server details.');
+        return;
+    }
+
+    // Load global config to use for port checking (but do NOT save it to local config)
+    const globalConfig = JSON.parse(fs.readFileSync(globalConfigPath, 'utf-8'));
+
+    // Project Questions (No sensitive info)
     const questions = [
-        // Type is now auto-detected, but we keep this as a confirmed variable internally
         {
             type: 'input',
             name: 'projectName',
@@ -25,28 +37,7 @@ async function init() {
             name: 'domain',
             message: 'Domain / Subdomain (leave empty for IP:PORT mode):'
         },
-        {
-            type: 'input',
-            name: 'serverIp',
-            message: 'Server IP:'
-        },
-        {
-            type: 'input',
-            name: 'sshUser',
-            message: 'SSH user:',
-            default: 'ubuntu'
-        },
-        {
-            type: 'input',
-            name: 'sshPort',
-            message: 'SSH port:',
-            default: '22'
-        },
-        {
-            type: 'input',
-            name: 'sshKeyPath',
-            message: 'SSH private key path:'
-        },
+        // We removed serverIp, sshUser, sshPort, sshKeyPath questions
         {
             type: 'input',
             name: 'appPort',
@@ -112,11 +103,12 @@ async function init() {
         log.info('Domain mode detected → auto-assigning internal port');
 
         try {
+            // Use GLOBAL credentials for this transient check
             await ssh.connect({
-                host: answers.serverIp,
-                username: answers.sshUser,
-                port: Number(answers.sshPort),
-                privateKeyPath: answers.sshKeyPath.replace(/^"|"$/g, '')
+                host: globalConfig.serverIp,
+                username: globalConfig.sshUser,
+                port: Number(globalConfig.sshPort),
+                privateKeyPath: globalConfig.sshKeyPath.replace(/^"|"$/g, '')
             });
 
             let selectedPort = null;
@@ -142,8 +134,9 @@ ss -tuln | grep -w ":${port} " || true
             log.success(`Auto-assigned internal port: ${selectedPort} ✅`);
             ssh.dispose();
 
-        } catch {
-            log.error('Failed to auto-assign port (SSH issue)');
+        } catch (e) {
+            log.error('Failed to auto-assign port (SSH issue)' + e.message);
+            // Don't exit hard, maybe user wants to continue? But usually fatal.
             process.exit(1);
         }
 
@@ -154,11 +147,12 @@ ss -tuln | grep -w ":${port} " || true
         log.info(`Checking port ${answers.appPort} availability...`);
 
         try {
+            // Use GLOBAL credentials
             await ssh.connect({
-                host: answers.serverIp,
-                username: answers.sshUser,
-                port: Number(answers.sshPort),
-                privateKeyPath: answers.sshKeyPath.replace(/^"|"$/g, '')
+                host: globalConfig.serverIp,
+                username: globalConfig.sshUser,
+                port: Number(globalConfig.sshPort),
+                privateKeyPath: globalConfig.sshKeyPath.replace(/^"|"$/g, '')
             });
 
             const check = await ssh.execCommand(`
@@ -179,13 +173,14 @@ docker ps --format "{{.Ports}}" | grep -w "${answers.appPort}->" || true
     }
 
     /* =====================================================
-       SAVE CONFIG
+       SAVE CONFIG (PROJECT ONLY)
     ===================================================== */
+    // Note: answers object ONLY contains project info now.
     fs.writeFileSync(
         'autoflow.config.json',
         JSON.stringify(answers, null, 2)
     );
-    log.success('autoflow.config.json created');
+    log.success('autoflow.config.json created (Clean & Secure)');
 
     /* =====================================================
        DOCKERFILE GENERATION
