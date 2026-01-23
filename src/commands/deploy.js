@@ -147,7 +147,7 @@ docker build --no-cache --progress=plain -t ${image} .
         ===================================================== */
         await ssh.execCommand(`docker rm -f ${container} || true`);
 
-        const containerPort = config.deploymentType === 'static' ? 80 : config.appPort;
+        const containerPort = config.appType === 'static' ? 80 : config.appPort;
         log.info(`Mapping: Host:${config.appPort} -> Container:${containerPort}`);
 
         const portBinding = config.domain
