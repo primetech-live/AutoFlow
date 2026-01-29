@@ -1,66 +1,107 @@
 # AutoFlow CLI
 
-AutoFlow is an automated CI/CD CLI tool designed for students and beginners. It simplifies the deployment process by bridging your local development environment directly to a remote server using Git and Docker.
+AutoFlow is an automated CI/CD CLI tool designed for students, freelancers, and beginners. It simplifies the deployment process by bridging your local development environment directly to a remote server using Git and Docker, automating complex DevOps tasks like SSL configuration, Reverse Proxy setup, and auto-healing.
 
 ---
 
-## 1. Codebase Analysis & Structure
+## 🚀 Why AutoFlow?
 
-The project starts at `bin/index.js`, which serves as the entry point using `commander` for argument parsing. It delegates commands to the `src/commands/` directory.
+Modern deployment is complex. **AutoFlow** abstracts away quirks of Linux administration, Docker orchestration, and Nginx configuration behind a simple, unified interface.
 
-### Key Files
-- **`bin/index.js`**: Registers commands (`init`, `deploy`, `status`, `stop`) and displays the CLI banner.
-- **`src/commands/init.js`**: Handles project setup.
-- **`src/commands/deploy.js`**: Manages the deployment pipeline.
-- **`src/utils/logger.js`**: comprehensive logging utility using `chalk` for colored output.
-
----
-
-## 2. Workflow & Logic Analysis
-
-### Initialization Flow (`autoflow init`)
-1.  **User Prompts**: Uses `inquirer` to collect project details (Project Name, Git URL, Server IP, SSH credentials, Port).
-2.  **Config Generation**: Saves these details to `autoflow.config.json` in the project root.
-3.  **Docker Scaffolding**:
-    -   Checks for an existing `Dockerfile`.
-    -   If missing, generates a default `node:18-alpine` Dockerfile.
-    -   Creates a `.dockerignore` file to exclude `node_modules` and secrets.
-
-### Deployment Flow (`autoflow deploy`)
-1.  **Validation**: Checks for `autoflow.config.json`.
-2.  **Local Git Sync**:
-    -   Checks if local git status is clean.
-    -   If not, automatically adds and commits changes with a default message.
-    -   Pushes code to the remote Git repository.
-3.  **SSH Connection**: Connects to the remote server using `node-ssh` with the provided private key.
-4.  **Remote Execution**:
-    -   **Cloning/Pulling**: Checks if the project folder exists on the server. If not, it clones the repo; otherwise, it pulls the latest changes.
-    -   **Building**: Runs `docker build -t <project_name> .`.
-    -   **Restarting**: Stops and removes the existing container, then starts a new one mapping the specified ports.
+- **Automated DevOps**: Replaces manual `ssh`, `git pull`, `pm2`, and `nginx.conf` editing.
+- **Docker-First**: Guarantees your app runs exactly the same on the server as it does locally.
+- **Secure by Default**: Automatically configures HTTPS (SSL) and secure Nginx proxies.
+- **Smart Detection**: Instantly recognizes Next.js, Vite, or Static sites and builds optimal Dockerfiles.
 
 ---
 
-## 3. Future Environment (Roadmap)
-To evolve AutoFlow into a robust tool, the following features are planned:
+## 📦 Features
 
--   **Multi-Environment Support**: Support for `staging` vs `production` configurations.
--   **Database Provisioning**: Automated setup of MongoDB/Postgres containers alongside the app.
--   **SSL Integration**: Automatic Nginx reverse proxy setup with Let's Encrypt.
--   **CI/CD Hooks**: GitHub Actions or GitLab CI integration to trigger deployments on push automatically.
+### 1. Smart Initialization (`autoflow init`)
+- **Framework Detection**: Scans your project (detects `next.config.js`, `vite.config.js`, etc.) and generates a production-ready `Dockerfile`.
+- **Zero-Config**: Uses sane defaults for ports and build commands.
+
+### 2. Global Secure Config (`autoflow setup`)
+- **Centralized Credentials**: Store your server IP and SSH keys securely once. No need to re-enter them for every project.
+- **Security**: Uses secure file permissions (`600`) to protect your private keys.
+
+### 3. Atomic Deployments (`autoflow deploy`)
+- **Swap Management**: Automatically creates Swap memory on low-RAM servers to prevent OOM crashes during builds.
+- **Zero-Downtime**: Builds the new container successfully *before* stopping the old one is theoretically possible (implementation uses rapid swap).
+- **Auto-SSL**: Integrates with **Certbot** to automatically provision valid Let's Encrypt certificates.
+- **Diagnostics**: Runs post-deploy health checks (Curl, Docker status) and streams logs if the container fails to start.
+
+### 4. Observability (`autoflow status`)
+- **Real-time Stats**: View CPU and RAM usage of your running container.
+- **Live Logs**: Stream application logs (stdout/stderr) directly to your local terminal.
 
 ---
 
-## 4. Improvements Required (Critical Analysis)
-Based on code analysis, the following areas require immediate improvement:
+## 🛠️ Installation
 
-### Security
--   **Sensitive Data**: `autoflow.config.json` stores the SSH private key path and username. This file should be added to `.gitignore` by default to prevent accidental commits.
--   **SSH Handling**: Using an SSH agent or prompting for a passphrase would be more secure than static paths.
+```bash
+npm install -g autoflow-cli
+```
 
-### Reliability (Zero-Downtime)
--   **Current Downtime**: The `deploy` command stops the old container *before* starting the new one.
--   **Improvement**: Implement a blue-green deployment strategy or use Traefik/Nginx to swap containers seamlessly without dropping connections.
+*Note: Ensure you have `git` and `ssh` available in your terminal.*
 
-### Error Handling
--   **Git Conflicts**: The implementation assumes `git pull` will always succeed. Conflicts on the server will break the deployment.
--   **Rollbacks**: There is currently no mechanism to revert to the previous Docker image if the new build fails to start.
+---
+
+## 📖 Usage Guide
+
+### Step 1: Global Setup (Run Once)
+Configure your VPS details globally so you don't have to repeat them.
+```bash
+autoflow setup
+```
+*Prompts for: Server IP, SSH Username (e.g., `ubuntu`), SSH Port, and Private Key Path.*
+
+### Step 2: Initialize Project
+Navigate to your project folder and initialize AutoFlow.
+```bash
+cd my-nextjs-app
+autoflow init
+```
+*Prompts for: Project Name, Git Repository URL, and Domain (optional). auto-detects framework.*
+
+### Step 3: Deploy
+Push your code to the server and go live.
+```bash
+autoflow deploy
+```
+*What happens:* 
+1. Auto-commits and pushes local changes to Git.
+2. Connects to server via SSH.
+3. Pulls latest code.
+4. Builds Docker image.
+5. Configures Nginx & SSL (if domain provided).
+6. Starts container.
+
+### Step 4: Manage
+Check if your app is running smoothly.
+```bash
+autoflow status
+```
+
+Stop the application and clean up resources:
+```bash
+autoflow stop
+```
+
+---
+
+## ⚙️ Architecture
+
+AutoFlow operates using a **Local -> Git -> Remote** pipeline:
+1. **Local**: You run `autoflow deploy`. CLI syncs code to your Git provider.
+2. **Remote**: CLI SSHs into your VPS.
+3. **Build**: Pulls code and runs `docker build`.
+4. **Serve**: Creates/Restarts Docker container and updates Nginx rules.
+
+---
+
+## 📝 Prerequisites
+
+- **Local Machine**: Node.js installed.
+- **Remote Server**: A Linux VPS (Ubuntu/Debian recommended) with `docker` and `git` installed.
+- **Domain (Optional)**: If using domain mode, ensure DNS points to your Server IP.
