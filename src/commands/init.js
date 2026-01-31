@@ -33,15 +33,11 @@ async function init() {
             type: 'input',
             name: 'domain',
             message: 'Domain / Subdomain (leave empty for IP:PORT mode):'
-        },
-        {
-            type: 'input',
-            name: 'appPort',
-            message: 'App port (used only if no domain):',
-            default: '3000',
-            validate: v => Number(v) >= 1024 ? true : 'Port must be >= 1024'
         }
     ];
+
+    // Default internal port for container
+    // Removed as we strictly use 3000/80 internally now
 
     const answers = await inquirer.prompt(questions);
 
@@ -60,13 +56,11 @@ async function init() {
             appType = 'vite';
             buildCommand = 'npm run build';
             startCommand = 'npm run preview -- --host 0.0.0.0 --port 3000';
-            answers.appPort = '3000';
             log.info('✨ Detected Vite App');
         } else if (deps?.next) {
             appType = 'next';
             buildCommand = 'npm run build';
             startCommand = 'npm start';
-            answers.appPort = '3000';
             log.info('✨ Detected Next.js App');
         } else {
             appType = 'node';
@@ -114,7 +108,7 @@ COPY package*.json ./
 RUN npm install
 COPY . .
 ${buildCommand ? `RUN ${buildCommand}` : ''}
-EXPOSE ${answers.appPort}
+EXPOSE 3000
 CMD ${JSON.stringify(startCommand.split(' '))}
 `;
     }

@@ -106,17 +106,41 @@ async function deploy() {
         const container = config.projectName;
 
         /* =====================================================
-           PORT CHECK (ONLY FOR PORT MODE)
+           PORT ALLOCATION (AUTO)
         ===================================================== */
-        if (!config.domain) {
-            const portCheck = await ssh.execCommand(`
-docker ps --format "{{.Ports}}" | grep -w "${config.appPort}->" || true
-`);
-            if (portCheck.stdout.trim()) {
-                log.error(`Port ${config.appPort} already in use ❌`);
-                ssh.dispose();
-                return;
+        const containerPort = config.appType === 'static' ? 80 : 3000;
+        let hostPort = null;
+
+        // 1. Try to reuse existing port if app is running
+        const currentMapping = await ssh.execCommand(`docker ps --filter "name=${container}" --format "{{.Ports}}"`);
+        if (currentMapping.stdout) {
+            // Regex to match "0.0.0.0:3005->..." or ":::3005->..."
+            const match = currentMapping.stdout.match(/:(\d+)->/);
+            if (match && match[1]) {
+                hostPort = match[1];
+                log.info(`Reusing existing port: ${hostPort}`);
             }
+        }
+
+        // 2. If not found, find a new free port (3000-4000)
+        if (!hostPort) {
+            log.info('Finding available port on server...');
+            const portFinder = await ssh.execCommand(`
+                MIN_PORT=3000
+                MAX_PORT=4000
+                for port in $(seq $MIN_PORT $MAX_PORT); do
+                    if ! sudo netstat -tuln | grep -q ":$port "; then
+                        echo $port
+                        break
+                    fi
+                done
+            `);
+            const freePort = portFinder.stdout.trim();
+            if (!freePort) {
+                throw new Error('No free ports available in range 3000-4000');
+            }
+            hostPort = freePort;
+            log.success(`Allocated new port: ${hostPort}`);
         }
 
         /* =====================================================
@@ -147,12 +171,11 @@ docker build --no-cache --progress=plain -t ${image} .
         ===================================================== */
         await ssh.execCommand(`docker rm -f ${container} || true`);
 
-        const containerPort = config.appType === 'static' ? 80 : config.appPort;
-        log.info(`Mapping: Host:${config.appPort} -> Container:${containerPort}`);
+        log.info(`Mapping: Host:${hostPort} -> Container:${containerPort}`);
 
         const portBinding = config.domain
-            ? `-p 127.0.0.1:${config.appPort}:${containerPort}`
-            : `-p ${config.appPort}:${containerPort}`;
+            ? `-p 127.0.0.1:${hostPort}:${containerPort}`
+            : `-p ${hostPort}:${containerPort}`;
 
         log.info('Starting container...');
         await exec(ssh, `
@@ -186,7 +209,7 @@ server {
     server_name ${config.domain};
 
     location / {
-        proxy_pass http://127.0.0.1:${config.appPort};
+        proxy_pass http://127.0.0.1:${hostPort};
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -201,7 +224,7 @@ server {
             // Search for "server_name example.com;" specifically to avoid partial matches
             // We use grep -r to find files containing the exact server_name directive
             const conflictCheck = await ssh.execCommand(`grep -l "server_name ${config.domain};" /etc/nginx/sites-enabled/*`);
-            
+
             if (conflictCheck.stdout) {
                 const conflicts = conflictCheck.stdout.trim().split('\n');
                 for (const conflict of conflicts) {
@@ -256,7 +279,7 @@ sudo certbot --nginx -d ${config.domain} \
 
             log.success(`Live at: https://${config.domain}`);
         } else {
-            log.success(`Live at: http://${config.serverIp}:${config.appPort}`);
+            log.success(`Live at: http://${config.serverIp}:${hostPort}`);
         }
 
         /* =====================================================
@@ -268,9 +291,9 @@ sudo certbot --nginx -d ${config.domain} \
 echo "=== DOCKER PS ==="
 docker ps --filter "name=${container}"
 echo "\n=== PORT LISTEN CHECK ==="
-sudo netstat -tuln | grep :${config.appPort} || echo "Port ${config.appPort} not listening"
+sudo netstat -tuln | grep :${hostPort} || echo "Port ${hostPort} not listening"
 echo "\n=== INTERNAL CURL TEST ==="
-curl -v http://127.0.0.1:${config.appPort} --max-time 2 2>&1 || echo "Curl failed"
+curl -v http://127.0.0.1:${hostPort} --max-time 2 2>&1 || echo "Curl failed"
 echo "\n=== NGINX ERROR LOGS ==="
 sudo tail -n 20 /var/log/nginx/error.log
 `);
