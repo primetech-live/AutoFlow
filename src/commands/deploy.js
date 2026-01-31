@@ -198,13 +198,15 @@ server {
 
             // Remove conflicting configs
             log.info('Checking for conflicting Nginx configs...');
-            const conflictCheck = await ssh.execCommand(`grep -l "${config.domain}" /etc/nginx/sites-enabled/*`);
+            // Search for "server_name example.com;" specifically to avoid partial matches
+            // We use grep -r to find files containing the exact server_name directive
+            const conflictCheck = await ssh.execCommand(`grep -l "server_name ${config.domain};" /etc/nginx/sites-enabled/*`);
+            
             if (conflictCheck.stdout) {
                 const conflicts = conflictCheck.stdout.trim().split('\n');
                 for (const conflict of conflicts) {
-                    // Don't remove if it matches current project name (we overwrite it anyway)
-                    // But if it's different (e.g. test-autoflow vs test3), REMOVE IT
                     const conflictName = path.basename(conflict);
+                    // Only remove if it's NOT the current project
                     if (conflictName !== config.projectName) {
                         log.warning(`Removing conflicting config: ${conflictName}`);
                         await exec(ssh, `sudo rm -f ${conflict}`, log);
@@ -219,19 +221,38 @@ sudo ln -sf ${confPath} /etc/nginx/sites-enabled/${config.projectName}
 sudo nginx -t
 `, log);
 
-            // Reload only if test passed (Use RESTART to be safe)
-            await exec(ssh, `sudo systemctl restart nginx`, log);
-
-
+            // Reload only if test passed
+            await exec(ssh, `sudo systemctl reload nginx`, log);
 
             /* =====================================================
                AUTO SSL (SAFE)
             ===================================================== */
             log.info('Ensuring SSL...');
-            await ssh.execCommand(`
+            try {
+                // Check if certbot is installed first
+                const checkCertbot = await ssh.execCommand('which certbot');
+                if (!checkCertbot.stdout.trim()) {
+                    log.warning('⚠️ Certbot not found. Skipping SSL setup.');
+                    log.info('Install certbot on your server to enable HTTPS automatically.');
+                } else {
+                    // Try to generate certificate
+                    const certResult = await ssh.execCommand(`
 sudo certbot --nginx -d ${config.domain} \
---non-interactive --agree-tos -m admin@${config.domain.split('.').slice(-2).join('.')} || true
+--non-interactive --agree-tos -m admin@${config.domain.split('.').slice(-2).join('.')}
 `);
+                    if (certResult.code !== 0) {
+                        log.warning('⚠️ SSL Generation failed. Site will run on HTTP only.');
+                        console.log(chalk.red('--- Certbot Error Output ---'));
+                        console.log(chalk.red(certResult.stderr || certResult.stdout));
+                        console.log(chalk.red('----------------------------'));
+                    } else {
+                        log.success(`SSL Configured successfully ✅`);
+                    }
+                }
+            } catch (sslError) {
+                log.warning('Unexpected error during SSL setup');
+                console.log(sslError);
+            }
 
             log.success(`Live at: https://${config.domain}`);
         } else {
