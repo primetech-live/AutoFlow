@@ -6,7 +6,7 @@ const { NodeSSH } = require('node-ssh');
 const os = require('os');
 
 async function init() {
-    log.header('AUTOFLOW INITIALIZATION');
+    log.header('AUTOFLOW INITIALIZATION (PRO)');
 
     const globalConfigPath = path.join(os.homedir(), '.autoflow', 'config.json');
     if (!fs.existsSync(globalConfigPath)) {
@@ -15,8 +15,7 @@ async function init() {
         return;
     }
 
-    const globalConfig = JSON.parse(fs.readFileSync(globalConfigPath, 'utf-8'));
-
+    // 1. Project Info
     const questions = [
         {
             type: 'input',
@@ -36,38 +35,81 @@ async function init() {
         }
     ];
 
-    // Default internal port for container
-    // Removed as we strictly use 3000/80 internally now
-
     const answers = await inquirer.prompt(questions);
 
     /* =====================================================
-       PROJECT TYPE DETECTION
+       SMART DETECTION ENGINE
     ===================================================== */
     let appType = 'node';
-    let buildCommand = '';
+    let buildCommand = null; // null means no build needed
     let startCommand = 'npm start';
+    let packageManager = 'npm';
+    let installCmd = 'npm install';
+    let runCmd = 'npm run';
 
+    // A. Detect Package Manager
+    if (fs.existsSync('pnpm-lock.yaml')) {
+        packageManager = 'pnpm';
+        installCmd = 'pnpm install';
+        runCmd = 'pnpm run';
+        log.info('📦 Detected Package Manager: pnpm');
+    } else if (fs.existsSync('yarn.lock')) {
+        packageManager = 'yarn';
+        installCmd = 'yarn install';
+        runCmd = 'yarn run';
+        log.info('📦 Detected Package Manager: yarn');
+    } else {
+        log.info('📦 Detected Package Manager: npm');
+    }
+
+    // B. Detect Framework & Config
     if (fs.existsSync('package.json')) {
         const pkg = JSON.parse(fs.readFileSync('package.json', 'utf-8'));
         const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+        const scripts = pkg.scripts || {};
 
-        if (deps?.vite) {
-            appType = 'vite';
-            buildCommand = 'npm run build';
-            startCommand = 'npm run preview -- --host 0.0.0.0 --port 3000';
-            log.info('✨ Detected Vite App');
-        } else if (deps?.next) {
+        if (deps.next) {
             appType = 'next';
-            buildCommand = 'npm run build';
-            startCommand = 'npm start';
-            log.info('✨ Detected Next.js App');
-        } else {
+            buildCommand = `${runCmd} build`;
+            startCommand = `${runCmd} start`;
+            log.info('✨ Detected Framework: Next.js (Production Mode)');
+        }
+        else if (deps.vite) {
+            appType = 'vite';
+            buildCommand = `${runCmd} build`;
+            // USE "serve" INSTEAD OF PREVIEW. Force bind to 0.0.0.0
+            startCommand = 'npx -y serve -s dist -l tcp://0.0.0.0:3000';
+            log.info('✨ Detected Framework: Vite (Using "serve" for Production)');
+        }
+        else if (deps['react-scripts']) {
+            appType = 'react';
+            buildCommand = `${runCmd} build`;
+            startCommand = 'npx -y serve -s build -l tcp://0.0.0.0:3000';
+            log.info('✨ Detected Framework: Create React App (Using "serve" for Production)');
+        }
+        else if (deps['@angular/cli']) {
+            appType = 'angular';
+            buildCommand = `${runCmd} build`;
+            startCommand = 'npx -y serve -s dist/browser -l 3000'; // Adjust common output
+            log.info('✨ Detected Framework: Angular');
+        }
+        else {
+            // Generic Node.js Detection
             appType = 'node';
-            if (pkg.scripts?.start) startCommand = 'npm start';
-            else if (pkg.main) startCommand = `node ${pkg.main}`;
-            else startCommand = 'node index.js';
-            log.info('✨ Detected Node.js App');
+            log.info('✨ Detected Framework: Node.js / Express');
+
+            if (scripts.build) {
+                buildCommand = `${runCmd} build`;
+                log.info('   Note: Build script detected and will be run.');
+            }
+
+            if (scripts.start) {
+                startCommand = `${runCmd} start`;
+            } else if (pkg.main) {
+                startCommand = `node ${pkg.main}`;
+            } else {
+                startCommand = 'node index.js';
+            }
         }
     } else if (fs.existsSync('index.html')) {
         appType = 'static';
@@ -88,12 +130,13 @@ async function init() {
     log.success('autoflow.config.json created');
 
     /* =====================================================
-       DOCKERFILE (ALWAYS)
+       DOCKERFILE GENERATION (The "Perfect" Dockerfile)
     ===================================================== */
     let dockerfile = '';
 
     if (appType === 'static') {
         dockerfile = `
+# Production Nginx for Static Site
 FROM nginx:alpine
 RUN rm -rf /usr/share/nginx/html/*
 COPY . /usr/share/nginx/html
@@ -101,20 +144,47 @@ EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
 `;
     } else {
+        // Dynamic Dockerfile based on Package Manager
+        let installStep = 'RUN npm install';
+        let setupPM = '';
+
+        if (packageManager === 'pnpm') {
+            setupPM = 'RUN npm install -g pnpm';
+            installStep = 'RUN pnpm install';
+        } else if (packageManager === 'yarn') {
+            installStep = 'RUN yarn install';
+        }
+
         dockerfile = `
 FROM node:20-alpine
+
 WORKDIR /app
-COPY package*.json ./
-RUN npm install
+
+# Install Package Manager if needed
+${setupPM}
+
+# Copy dependency definitions
+COPY package*.json ${packageManager === 'pnpm' ? 'pnpm-lock.yaml ' : ''}${packageManager === 'yarn' ? 'yarn.lock ' : ''}./
+
+# Install dependencies
+${installStep}
+
+# Copy Source
 COPY . .
-${buildCommand ? `RUN ${buildCommand}` : ''}
+
+# Build (if needed)
+${buildCommand ? `RUN ${buildCommand}` : '# No build step required'}
+
+# Expose Port
 EXPOSE 3000
+
+# Start Command
 CMD ${JSON.stringify(startCommand.split(' '))}
 `;
     }
 
     fs.writeFileSync('Dockerfile', dockerfile.trim());
-    log.success('Dockerfile generated');
+    log.success('Dockerfile generated (Optimized for Production 🚀)');
 
     /* =====================================================
        .dockerignore
@@ -125,12 +195,15 @@ CMD ${JSON.stringify(startCommand.split(' '))}
             `node_modules
 .git
 .env
+dist
+build
 autoflow.config.json`
         );
         log.success('.dockerignore created');
     }
 
-    log.success(`Initialization complete 🎉 (${appType.toUpperCase()})`);
+    log.success(`\nInitialization complete! 🎉`);
+    log.info(`Ready to deploy ${answers.projectName} as a ${appType.toUpperCase()} app.`);
 }
 
 module.exports = init;

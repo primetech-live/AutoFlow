@@ -128,8 +128,12 @@ async function deploy() {
             const portFinder = await ssh.execCommand(`
                 MIN_PORT=3000
                 MAX_PORT=4000
+                # Use ss (Socket Stats) as primary, netstat as fallback
+                CHECK_CMD="sudo ss -tuln 2>/dev/null || sudo netstat -tuln 2>/dev/null"
+                
                 for port in $(seq $MIN_PORT $MAX_PORT); do
-                    if ! sudo netstat -tuln | grep -q ":$port "; then
+                    # Check if port is in use (grep returns 0 if found)
+                    if ! eval "$CHECK_CMD" | grep -E -q ":$port\\b"; then
                         echo $port
                         break
                     fi
@@ -210,9 +214,14 @@ server {
 
     location / {
         proxy_pass http://127.0.0.1:${hostPort};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
         proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_cache_bypass $http_upgrade;
     }
 }
 `;
@@ -221,31 +230,46 @@ server {
 
             // Remove conflicting configs
             log.info('Checking for conflicting Nginx configs...');
-            // Search for "server_name example.com;" specifically to avoid partial matches
-            // We use grep -r to find files containing the exact server_name directive
-            const conflictCheck = await ssh.execCommand(`grep -l "server_name ${config.domain};" /etc/nginx/sites-enabled/*`);
+            // Find ANY file in sites-enabled that contains the domain name
+            const conflictCheck = await ssh.execCommand(`grep -Rl "${config.domain}" /etc/nginx/sites-enabled/`);
 
             if (conflictCheck.stdout) {
                 const conflicts = conflictCheck.stdout.trim().split('\n');
                 for (const conflict of conflicts) {
                     const conflictName = path.basename(conflict);
-                    // Only remove if it's NOT the current project
-                    if (conflictName !== config.projectName) {
-                        log.warning(`Removing conflicting config: ${conflictName}`);
-                        await exec(ssh, `sudo rm -f ${conflict}`, log);
-                        await exec(ssh, `sudo rm -f /etc/nginx/sites-available/${conflictName}`, log);
+
+                    // Skip if it's the current project or a certbot generated file for the current project
+                    if (conflictName === config.projectName || conflictName.startsWith(`${config.projectName}-`)) {
+                        continue;
                     }
+
+                    log.warning(`⚠️  Found conflicting config: ${conflictName}`);
+                    log.info(`   Removing ${conflict} to prevent conflicts...`);
+
+                    // Backup before delete (just in case)
+                    await exec(ssh, `sudo cp ${conflict} /home/${config.sshUser}/backup-${conflictName}.conf || true`, log);
+
+                    // Nuke it
+                    await exec(ssh, `sudo rm -f ${conflict}`, log);
+
+                    // Also try to remove from sites-available if it exists there to be clean
+                    await exec(ssh, `sudo rm -f /etc/nginx/sites-available/${conflictName}`, log);
                 }
             }
 
+            // Write new config
             await exec(ssh, `
 echo '${nginxConf.replace(/'/g, `'\\''`)}' | sudo tee ${confPath} > /dev/null
 sudo ln -sf ${confPath} /etc/nginx/sites-enabled/${config.projectName}
+# Fix: Ensure port is updated in potentially existing Certbot SSL config
+sudo sed -i 's|proxy_pass http://127.0.0.1:[0-9]*;|proxy_pass http://127.0.0.1:${hostPort};|g' /etc/nginx/sites-enabled/${config.projectName}*
 sudo nginx -t
 `, log);
 
-            // Reload only if test passed
             await exec(ssh, `sudo systemctl reload nginx`, log);
+
+            // Fix: Allow Nginx to connect to upstream (SELinux fix)
+            await exec(ssh, `sudo setsebool -P httpd_can_network_connect 1 2>/dev/null || true`, log);
 
             /* =====================================================
                AUTO SSL (SAFE)
@@ -283,32 +307,8 @@ sudo certbot --nginx -d ${config.domain} \
         }
 
         /* =====================================================
-           DIAGNOSTICS (DEBUGGING 502)
+           DEPLOYMENT SUCCESS
         ===================================================== */
-        log.info('Running post-deploy diagnostics...');
-        try {
-            const diagInfo = await ssh.execCommand(`
-echo "=== DOCKER PS ==="
-docker ps --filter "name=${container}"
-echo "\n=== PORT LISTEN CHECK ==="
-sudo netstat -tuln | grep :${hostPort} || echo "Port ${hostPort} not listening"
-echo "\n=== INTERNAL CURL TEST ==="
-curl -v http://127.0.0.1:${hostPort} --max-time 2 2>&1 || echo "Curl failed"
-echo "\n=== NGINX ERROR LOGS ==="
-sudo tail -n 20 /var/log/nginx/error.log
-`);
-            if (diagInfo.stdout.includes('Refused') || diagInfo.stdout.includes('Curl failed')) {
-                log.warning('⚠️ INTERNAL CONNECTIVITY CHECK FAILED. Fetching container logs...');
-                console.log(chalk.gray(diagInfo.stdout)); // Show diagnostics only on failure
-                const logs = await ssh.execCommand(`docker logs --tail 20 ${container}`);
-                console.log(chalk.red(logs.stdout || logs.stderr));
-            } else {
-                log.success('Internal connectivity test passed ✅');
-            }
-        } catch (e) {
-            log.warning('Diagnostics failed to run');
-        }
-
         log.success('DEPLOYMENT COMPLETE 🚀');
         ssh.dispose();
 
