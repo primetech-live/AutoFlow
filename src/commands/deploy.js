@@ -234,8 +234,8 @@ server {
             const conflictCheck = await ssh.execCommand(`grep -Rl "${config.domain}" /etc/nginx/sites-enabled/`);
 
             if (conflictCheck.stdout) {
-                const conflicts = conflictCheck.stdout.trim().split('\n');
-                for (const conflict of conflicts) {
+                const potentialConflicts = conflictCheck.stdout.trim().split('\n');
+                for (const conflict of potentialConflicts) {
                     const conflictName = path.basename(conflict);
 
                     // Skip if it's the current project or a certbot generated file for the current project
@@ -243,17 +243,42 @@ server {
                         continue;
                     }
 
-                    log.warning(`⚠️  Found conflicting config: ${conflictName}`);
-                    log.info(`   Removing ${conflict} to prevent conflicts...`);
+                    // Strict check: Read file and verify it actually listens on this specific domain
+                    // This prevents deleting "subdomain.example.com" when deploying "example.com"
+                    const contentCmd = await ssh.execCommand(`cat "${conflict}"`);
+                    const content = contentCmd.stdout || '';
 
-                    // Backup before delete (just in case)
-                    await exec(ssh, `sudo cp ${conflict} /home/${config.sshUser}/backup-${conflictName}.conf || true`, log);
+                    // Simple parser: remove comments, find server_name blocks
+                    const cleanContent = content.replace(/#.*/g, '');
+                    const serverNameMatches = cleanContent.match(/server_name\s+([^;]+);/g);
 
-                    // Nuke it
-                    await exec(ssh, `sudo rm -f ${conflict}`, log);
+                    let isRealConflict = false;
+                    if (serverNameMatches) {
+                        for (const match of serverNameMatches) {
+                            // Extract args: " example.com www.example.com"
+                            const args = match.replace('server_name', '').replace(';', '').trim().split(/\s+/);
+                            if (args.includes(config.domain)) {
+                                isRealConflict = true;
+                                break;
+                            }
+                        }
+                    }
 
-                    // Also try to remove from sites-available if it exists there to be clean
-                    await exec(ssh, `sudo rm -f /etc/nginx/sites-available/${conflictName}`, log);
+                    if (isRealConflict) {
+                        log.warning(`⚠️  Found conflicting config: ${conflictName}`);
+                        log.info(`   Removing ${conflict} to prevent conflicts...`);
+
+                        // Backup before delete (just in case)
+                        await exec(ssh, `sudo cp ${conflict} /home/${config.sshUser}/backup-${conflictName}.conf || true`, log);
+
+                        // Nuke it
+                        await exec(ssh, `sudo rm -f ${conflict}`, log);
+
+                        // Also try to remove from sites-available if it exists there to be clean
+                        await exec(ssh, `sudo rm -f /etc/nginx/sites-available/${conflictName}`, log);
+                    } else {
+                        log.info(`ℹ️  Ignoring false positive conflict: ${conflictName} (Found domain string, but not as exact server_name)`);
+                    }
                 }
             }
 
@@ -282,18 +307,34 @@ sudo nginx -t
                     log.warning('⚠️ Certbot not found. Skipping SSL setup.');
                     log.info('Install certbot on your server to enable HTTPS automatically.');
                 } else {
-                    // Try to generate certificate
+                    // Check if certificate exists BEFORE running certbot
+                    const certPath = `/etc/letsencrypt/live/${config.domain}/fullchain.pem`;
+                    const preCheck = await ssh.execCommand(`sudo test -f ${certPath} && echo "EXISTS" || echo "MISSING"`);
+
+                    if (preCheck.stdout.trim() === 'MISSING') {
+                        log.warning(`SSL Certificate for ${config.domain} is missing. Generating new one...`);
+                    } else {
+                        log.info(`SSL Certificate found. Configuring Nginx to use it...`);
+                    }
+
+                    // Run Certbot (Generates if missing, Installs/Updates if exists)
+                    // Added --redirect to force HTTP -> HTTPS
                     const certResult = await ssh.execCommand(`
 sudo certbot --nginx -d ${config.domain} \
---non-interactive --agree-tos -m admin@${config.domain.split('.').slice(-2).join('.')}
+--non-interactive --agree-tos --redirect \
+-m admin@${config.domain.split('.').slice(-2).join('.')}
 `);
                     if (certResult.code !== 0) {
-                        log.warning('⚠️ SSL Generation failed. Site will run on HTTP only.');
-                        console.log(chalk.red('--- Certbot Error Output ---'));
+                        log.warning('⚠️ SSL Configuration failed. Details:');
                         console.log(chalk.red(certResult.stderr || certResult.stdout));
-                        console.log(chalk.red('----------------------------'));
                     } else {
-                        log.success(`SSL Configured successfully ✅`);
+                        // Double check existence after run
+                        const postCheck = await ssh.execCommand(`sudo test -f ${certPath} && echo "EXISTS" || echo "MISSING"`);
+                        if (postCheck.stdout.trim() === 'EXISTS') {
+                            log.success(`SSL Configured successfully ✅`);
+                        } else {
+                            log.warning(`⚠️ Certbot finished but certificate file is still missing.`);
+                        }
                     }
                 }
             } catch (sslError) {
@@ -301,7 +342,19 @@ sudo certbot --nginx -d ${config.domain} \
                 console.log(sslError);
             }
 
-            log.success(`Live at: https://${config.domain}`);
+            // Verify SSL success by checking for certificate file
+            const certPath = `/etc/letsencrypt/live/${config.domain}/fullchain.pem`;
+            const certCheck = await ssh.execCommand(`sudo test -f ${certPath} && echo "EXISTS" || echo "MISSING"`);
+
+            if (certCheck.stdout.trim() === 'EXISTS') {
+                log.success(`SSL Configured successfully ✅`);
+                log.success(`Live at: https://${config.domain}`);
+            } else {
+                log.error(`SSL Certificate Missing! The site is running on HTTP (Not Secure).`);
+                log.info(`To fix, try running this command manually on the server:`);
+                console.log(chalk.yellow(`sudo certbot --nginx -d ${config.domain}`));
+                log.info(`Live at: http://${config.domain} (Not Secure)`);
+            }
         } else {
             log.success(`Live at: http://${config.serverIp}:${hostPort}`);
         }
