@@ -1,14 +1,20 @@
 {
   "name": "autoflow-cli",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Automated CI/CD CLI tool for students and beginners",
-  "main": "bin/index.js",
+  "main": "dist/bin/index.js",
   "bin": {
-    "autoflow": "./bin/index.js"
+    "autoflow": "./dist/bin/index.js"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node bin/index.js"
+    "build": "tsc",
+    "start": "node dist/bin/index.js",
+    "dev": "ts-node bin/index.ts",
+    "postinstall": "node scripts/postinstall.js",
+    "prepublishOnly": "npm run build"
+  },
+  "engines": {
+    "node": ">=18"
   },
   "keywords": [
     "cli",
@@ -16,13 +22,16 @@
     "automation",
     "devops",
     "docker",
-    "ssh"
+    "ssh",
+    "cicd"
   ],
   "author": "",
   "license": "MIT",
   "files": [
     "bin",
-    "src"
+    "src",
+    "dist",
+    "scripts"
   ],
   "dependencies": {
     "chalk": "^4.1.2",
@@ -32,5 +41,13 @@
     "node-ssh": "^13.2.1",
     "shelljs": "^0.10.0",
     "simple-git": "^3.30.0"
+  },
+  "devDependencies": {
+    "@types/figlet": "^1.7.0",
+    "@types/inquirer": "^8.2.10",
+    "@types/node": "^22.0.0",
+    "@types/shelljs": "^0.8.15",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.0"
   }
 }
