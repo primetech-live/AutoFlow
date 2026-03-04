@@ -61,6 +61,76 @@ async function setup(): Promise<void> {
 
     // ── Z+ Security Vault Setup (Part of Global Setup) ─────────────────
     log.header('Z+ SECURITY VAULT SETUP');
+    const existingVault = loadVaultConfig();
+
+    if (existingVault) {
+        const { vaultAction } = await inquirer.prompt([{
+            type: 'list',
+            name: 'vaultAction',
+            message: 'Z+ Security Vault already exists. What would you like to do?',
+            choices: [
+                { name: 'Keep current vault settings', value: 'keep' },
+                { name: 'Change Master Password (requires current OTP)', value: 'change_password' },
+                { name: 'Full Reset (Destructive - deletes everything)', value: 'reset' }
+            ]
+        }]);
+
+        if (vaultAction === 'keep') {
+            log.info('✔ Vault kept as is.');
+            log.info(`\nLocation: ${configPath}`);
+            log.info('You can now run "autoflow init" in any project.');
+            return;
+        }
+
+        if (vaultAction === 'change_password') {
+            const { token } = await inquirer.prompt([{
+                type: 'input',
+                name: 'token',
+                message: 'Confirm identity with 6-digit OTP:',
+            }]);
+
+            if (speakeasy.totp.verify({
+                secret: existingVault.totpSecret,
+                encoding: 'base32',
+                token
+            })) {
+                const { newPassword } = await inquirer.prompt([{
+                    type: 'password',
+                    name: 'newPassword',
+                    message: 'Enter New Master Password:',
+                    mask: '*'
+                }]);
+                const salt = crypto.randomBytes(16).toString('hex');
+                saveVaultConfig({
+                    ...existingVault,
+                    passwordHash: hashPassword(newPassword, salt),
+                    salt: salt
+                });
+                log.success('✔ Master password updated successfully!');
+                return;
+            } else {
+                log.error('✘ OTP Verification failed.');
+                return;
+            }
+        }
+
+        if (vaultAction === 'reset') {
+            const { confirmReset } = await inquirer.prompt([{
+                type: 'confirm',
+                name: 'confirmReset',
+                message: 'Are you sure? This will delete your master password and OTP secret.',
+                default: false
+            }]);
+            if (confirmReset) {
+                const { deleteVault } = require('../utils/vaultService');
+                deleteVault();
+                log.info('Vault deleted. Starting fresh setup...');
+            } else {
+                return;
+            }
+        }
+    }
+
     const { setupVault } = await inquirer.prompt([{
         type: 'confirm',
         name: 'setupVault',

@@ -81,3 +81,13 @@ export function decrypt(encryptedData: string, password: string, salt: string): 
 
     return decrypted;
 }
+
+/**
+ * Deletes the vault configuration (Reset)
+ */
+export function deleteVault(): void {
+    if (fs.existsSync(VAULT_PATH)) {
+        fs.unlinkSync(VAULT_PATH);
+    }
+}
+
