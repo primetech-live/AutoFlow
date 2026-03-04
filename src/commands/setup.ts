@@ -2,8 +2,12 @@ import inquirer from 'inquirer';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import crypto from 'crypto';
+import speakeasy from 'speakeasy';
+import qrcode from 'qrcode-terminal';
 import log from '../utils/logger';
 import { saveGlobalConfig, GlobalConfig } from '../utils/config';
+import { saveVaultConfig, hashPassword, loadVaultConfig } from '../utils/vaultService';
 
 async function setup(): Promise<void> {
     log.header('AUTOFLOW GLOBAL CONFIGURATION');
@@ -54,7 +58,58 @@ async function setup(): Promise<void> {
     saveGlobalConfig(answers);
 
     log.success('Global configuration saved securely 🔒');
-    log.info(`Location: ${configPath}`);
+
+    // ── Z+ Security Vault Setup (Part of Global Setup) ─────────────────
+    log.header('Z+ SECURITY VAULT SETUP');
+    const { setupVault } = await inquirer.prompt([{
+        type: 'confirm',
+        name: 'setupVault',
+        message: 'Enable Z+ Security (Military-Grade Encryption + OTP)?',
+        default: true
+    }]);
+
+    if (setupVault) {
+        const { password } = await inquirer.prompt([{
+            type: 'password',
+            name: 'password',
+            message: 'Set a Master Deployment Password:',
+            mask: '*'
+        }]);
+
+        log.info('Generating TOTP Secret...');
+        const secret = speakeasy.generateSecret({
+            name: `AutoFlow (${os.hostname()})`
+        });
+
+        log.info('\nScan this QR code with Google Authenticator or Authy:\n');
+        qrcode.generate(secret.otpauth_url || '', { small: true });
+
+        const { token } = await inquirer.prompt([{
+            type: 'input',
+            name: 'token',
+            message: 'Enter the 6-digit code to verify:',
+        }]);
+
+        const verified = speakeasy.totp.verify({
+            secret: secret.base32,
+            encoding: 'base32',
+            token
+        });
+
+        if (verified) {
+            const salt = crypto.randomBytes(16).toString('hex');
+            saveVaultConfig({
+                passwordHash: hashPassword(password, salt),
+                totpSecret: secret.base32,
+                salt: salt
+            });
+            log.success('✔ Z+ Security Vault established!');
+        } else {
+            log.error('✘ Verification failed. You can re-run "setup" to try again.');
+        }
+    }
+
+    log.info(`\nLocation: ${configPath}`);
     log.info('You can now run "autoflow init" in any project.');
 }
 

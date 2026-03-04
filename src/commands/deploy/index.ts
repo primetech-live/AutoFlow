@@ -12,6 +12,9 @@ import { startContainer, verifyContainerHealth } from './containerService';
 import { backupContainer, confirmDeploy, triggerRollback } from './rollback';
 import { configureNginx } from './nginxService';
 import { provisionSSL } from './sslService';
+import { syncEnv, unlockEnvOnServer, cleanupEnv } from './envService';
+import { loadVaultConfig } from '../../utils/vaultService';
+import inquirer from 'inquirer';
 
 async function deploy(): Promise<void> {
     // Top-level catch — ensures NO raw stack traces ever reach the user
@@ -53,8 +56,25 @@ async function deploy(): Promise<void> {
             // ── Step 9: Build Docker image ───────────────────────────────────
             await buildDockerImage(ssh, projectDir, image);
 
+            // ── Step 9.5: Environment Sync & Unlock (Z+ Security) ────────────
+            const vault = loadVaultConfig();
+
+            if (vault) {
+                // This will prompt for Password + OTP
+                const password = await syncEnv(ssh, projectDir);
+
+                if (password) {
+                    await unlockEnvOnServer(ssh, projectDir, password, vault.salt);
+                }
+            }
+
             // ── Step 10: Start new container ─────────────────────────────────
             await startContainer(ssh, container, image, hostPort, containerPort, !!config.domain);
+
+            // ── Step 10.5: Cleanup ───────────────────────────────────────────
+            if (vault) {
+                await cleanupEnv(ssh, projectDir);
+            }
 
             // ── Step 11: Health check → confirm or rollback ──────────────────
             try {

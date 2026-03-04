@@ -26,7 +26,7 @@ program
 
 program
     .command('setup')
-    .description('Configure global server details securely')
+    .description('Configure global server details and security vault')
     .action(setup);
 
 program

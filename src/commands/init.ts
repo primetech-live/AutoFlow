@@ -130,6 +130,18 @@ CMD ${JSON.stringify(startCommand.split(' '))}`;
     log.success('.dockerignore created ✔');
   }
 
+  // Ensure .env is in .gitignore
+  if (fs.existsSync('.gitignore')) {
+    const gitignore = fs.readFileSync('.gitignore', 'utf-8');
+    if (!gitignore.includes('.env')) {
+      fs.appendFileSync('.gitignore', '\n# AutoFlow Secrets\n.env\nautoflow.config.json\n');
+      log.success('.env added to .gitignore ✔');
+    }
+  } else {
+    fs.writeFileSync('.gitignore', 'node_modules\n.env\nautoflow.config.json\n.DS_Store\n');
+    log.success('.gitignore created ✔');
+  }
+
   // Generate .autoflow.yml for static projects (required by CI checks)
   if (appType === 'static' && !fs.existsSync('.autoflow.yml') && !fs.existsSync('.autoflow.yaml')) {
     const autoflowYml = [

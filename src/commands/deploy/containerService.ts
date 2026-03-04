@@ -19,13 +19,14 @@ export async function startContainer(
         : `-p ${hostPort}:${containerPort}`;
 
     log.info(`Port mapping: Host:${hostPort} → Container:${containerPort}`);
-    log.info('Starting container...');
+    log.info('Starting container with Z+ environment injection...');
 
     await exec(ssh, `
 docker run -d \\
   --restart unless-stopped \\
   ${portBinding} \\
   --name ${containerName} \\
+  --env-file .env \\
   ${imageName}
 `);
 }
