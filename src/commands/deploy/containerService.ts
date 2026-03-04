@@ -5,6 +5,7 @@ import { exec, AutoFlowError, EXIT_CODES } from './errors';
 
 export async function startContainer(
     ssh: NodeSSH,
+    projectDir: string,
     containerName: string,
     imageName: string,
     hostPort: string,
@@ -22,6 +23,7 @@ export async function startContainer(
     log.info('Starting container with Z+ environment injection...');
 
     await exec(ssh, `
+cd ${projectDir} && \\
 docker run -d \\
   --restart unless-stopped \\
   ${portBinding} \\

@@ -69,7 +69,7 @@ async function deploy(): Promise<void> {
             }
 
             // ── Step 10: Start new container ─────────────────────────────────
-            await startContainer(ssh, container, image, hostPort, containerPort, !!config.domain);
+            await startContainer(ssh, projectDir, container, image, hostPort, containerPort, !!config.domain);
 
             // ── Step 10.5: Cleanup ───────────────────────────────────────────
             if (vault) {
