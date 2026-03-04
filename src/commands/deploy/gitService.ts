@@ -2,7 +2,7 @@ import simpleGit from 'simple-git';
 import log from '../../utils/logger';
 import { AutoFlowError, EXIT_CODES } from './errors';
 
-export async function syncLocalGit(): Promise<void> {
+export async function syncLocalGit(): Promise<string> {
     const git = simpleGit();
 
     log.info('Checking local git status...');
@@ -21,6 +21,10 @@ export async function syncLocalGit(): Promise<void> {
         log.info('Pushing to remote...');
         await git.push();
         log.success('Code pushed to remote successfully ✔');
+
+        // Get the latest SHA
+        const rev = await git.revparse(['HEAD']);
+        return rev.trim();
     } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
         throw new AutoFlowError(

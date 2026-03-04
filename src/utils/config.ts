@@ -16,6 +16,7 @@ export interface ProjectConfig {
     appType: string;
     deploymentType: string;
     mode: 'domain' | 'port';
+    strictCI?: boolean;
 }
 
 export type MergedConfig = GlobalConfig & ProjectConfig;

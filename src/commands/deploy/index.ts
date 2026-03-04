@@ -1,7 +1,7 @@
 import log from '../../utils/logger';
 import { handleFatalError } from './errors';
 import { loadConfig } from './configService';
-import { runCIChecks } from './ci';
+import { runCIChecks, waitForRemoteCI } from './ci';
 import { syncLocalGit } from './gitService';
 import { connectSSH } from './sshService';
 import { ensureSwap } from './swapService';
@@ -25,13 +25,16 @@ async function deploy(): Promise<void> {
         const container = config.projectName;
         const containerPort = config.appType === 'static' ? 80 : 3000;
 
-        // ── Step 2: CI Checks (local, pre-push) ─────────────────────────────
-        await runCIChecks();
+        // ── Step 2: Local CI Checks (pre-push) ────────────────────────────────
+        await runCIChecks(config.appType, config.strictCI);
 
         // ── Step 3: Git sync (local → remote repo) ───────────────────────────
-        await syncLocalGit();
+        const sha = await syncLocalGit();
 
-        // ── Step 4: SSH Connect ──────────────────────────────────────────────
+        // ── Step 4: Remote CI Checks (GitHub Actions) ───────────────────────
+        await waitForRemoteCI(config.gitRepo, sha, config.strictCI);
+
+        // ── Step 5: SSH Connect ──────────────────────────────────────────────
         const ssh = await connectSSH(config);
 
         try {
