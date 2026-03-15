@@ -1,6 +1,7 @@
 import { execSync } from 'child_process';
 import fs from 'fs';
 import https from 'https';
+import path from 'path';
 import log from '../../utils/logger';
 import { AutoFlowError, EXIT_CODES } from './errors';
 
@@ -335,13 +336,171 @@ function getGitHubCheckRuns(owner: string, repo: string, sha: string): Promise<G
 }
 
 
+// ── PHP checks ───────────────────────────────────────────────────────────────
+function runPhpChecks(): void {
+    log.info('PHP project detected. Running PHP CI checks...\n');
+
+    const cwd = process.cwd();
+    const checks: { label: string; pass: boolean; tip?: string }[] = [];
+
+    // 1. index.php or public/index.php must exist
+    const hasIndex = fs.existsSync(`${cwd}/index.php`) || fs.existsSync(`${cwd}/public/index.php`);
+    checks.push({ label: 'index.php exists', pass: hasIndex, tip: 'PHP projects must have an index.php entry point.' });
+
+    // 2. Dockerfile must exist
+    const hasDockerfile = fs.existsSync(`${cwd}/Dockerfile`);
+    checks.push({ label: 'Dockerfile exists', pass: hasDockerfile, tip: 'Run "autoflow init" to generate a Dockerfile.' });
+
+    let failed = false;
+    for (const check of checks) {
+        if (check.pass) { log.success(`  ✔ ${check.label}`); }
+        else { log.error(`  ✘ ${check.label}`); if (check.tip) log.info(`    Tip: ${check.tip}`); failed = true; }
+    }
+
+    // 3. PHP lint (syntax check) — cross-platform, runs only if php is available locally
+    try {
+        const { execSync: exec } = require('child_process');
+        // Cross-platform recursive PHP file finder using Node.js fs
+        const phpFiles: string[] = [];
+        const walk = (dir: string) => {
+            for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+                const full = path.join(dir, entry.name);
+                const rel = path.relative(cwd, full);
+                if (entry.isDirectory()) {
+                    if (['.git', 'vendor', 'node_modules'].includes(entry.name)) continue;
+                    walk(full);
+                } else if (entry.isFile() && entry.name.endsWith('.php')) {
+                    phpFiles.push(rel);
+                }
+            }
+        };
+        walk(cwd);
+
+        let lintFailed = false;
+        for (const file of phpFiles) {
+            try { exec(`php -l "${file}"`, { cwd, stdio: 'pipe', encoding: 'utf-8' }); }
+            catch { log.error(`  ✘ PHP syntax error in: ${file}`); lintFailed = true; }
+        }
+        if (!lintFailed) log.success(`  ✔ PHP syntax check passed (${phpFiles.length} file(s))`);
+        else failed = true;
+    } catch {
+        log.warning('  ⚠️  php not found locally — skipping syntax check (it will run on GitHub Actions).');
+    }
+
+    if (failed) {
+        throw new AutoFlowError(
+            'PHP CI checks failed. Fix the issues above and try again.',
+            EXIT_CODES.CI_FAILED, 'CI'
+        );
+    }
+    log.success('✔ All PHP CI checks passed! Proceeding to deployment...\n');
+}
+
+// ── Python / Django / Flask checks ───────────────────────────────────────────
+function runPythonChecks(): void {
+    log.info('Python project detected. Running Python CI checks...\n');
+    const cwd = process.cwd();
+    const checks: { label: string; pass: boolean; tip?: string }[] = [
+        { label: 'requirements.txt exists', pass: fs.existsSync(`${cwd}/requirements.txt`), tip: 'Create a requirements.txt with your dependencies.' },
+        { label: 'Dockerfile exists', pass: fs.existsSync(`${cwd}/Dockerfile`), tip: 'Run "autoflow init" to generate a Dockerfile.' },
+    ];
+    let failed = false;
+    for (const check of checks) {
+        if (check.pass) { log.success(`  ✔ ${check.label}`); }
+        else { log.error(`  ✘ ${check.label}`); if (check.tip) log.info(`    Tip: ${check.tip}`); failed = true; }
+    }
+    if (failed) throw new AutoFlowError('Python CI checks failed.', EXIT_CODES.CI_FAILED, 'CI');
+    log.success('✔ All Python CI checks passed! Proceeding to deployment...\n');
+}
+
+// ── Ruby / Rails checks ───────────────────────────────────────────────────────
+function runRailsChecks(): void {
+    log.info('Ruby project detected. Running Ruby CI checks...\n');
+    const cwd = process.cwd();
+    const checks: { label: string; pass: boolean; tip?: string }[] = [
+        { label: 'Gemfile exists', pass: fs.existsSync(`${cwd}/Gemfile`), tip: 'A Gemfile is required for Ruby projects.' },
+        { label: 'Gemfile.lock exists', pass: fs.existsSync(`${cwd}/Gemfile.lock`), tip: 'Run "bundle install" locally first to generate Gemfile.lock.' },
+        { label: 'Dockerfile exists', pass: fs.existsSync(`${cwd}/Dockerfile`), tip: 'Run "autoflow init" to generate a Dockerfile.' },
+    ];
+    let failed = false;
+    for (const check of checks) {
+        if (check.pass) { log.success(`  ✔ ${check.label}`); }
+        else { log.error(`  ✘ ${check.label}`); if (check.tip) log.info(`    Tip: ${check.tip}`); failed = true; }
+    }
+    if (failed) throw new AutoFlowError('Ruby CI checks failed.', EXIT_CODES.CI_FAILED, 'CI');
+    log.success('✔ All Ruby CI checks passed! Proceeding to deployment...\n');
+}
+
+// ── Go checks ─────────────────────────────────────────────────────────────────
+function runGoChecks(): void {
+    log.info('Go project detected. Running Go CI checks...\n');
+    const cwd = process.cwd();
+    const checks: { label: string; pass: boolean; tip?: string }[] = [
+        { label: 'go.mod exists', pass: fs.existsSync(`${cwd}/go.mod`), tip: 'Run "go mod init" to initialise the Go module.' },
+        { label: 'go.sum exists', pass: fs.existsSync(`${cwd}/go.sum`), tip: 'Run "go mod tidy" to generate go.sum.' },
+        { label: 'Dockerfile exists', pass: fs.existsSync(`${cwd}/Dockerfile`), tip: 'Run "autoflow init" to generate a Dockerfile.' },
+    ];
+    let failed = false;
+    for (const check of checks) {
+        if (check.pass) { log.success(`  ✔ ${check.label}`); }
+        else { log.error(`  ✘ ${check.label}`); if (check.tip) log.info(`    Tip: ${check.tip}`); failed = true; }
+    }
+    if (failed) throw new AutoFlowError('Go CI checks failed.', EXIT_CODES.CI_FAILED, 'CI');
+    log.success('✔ All Go CI checks passed! Proceeding to deployment...\n');
+}
+
+// ── Java / Maven checks ───────────────────────────────────────────────────────
+function runJavaChecks(): void {
+    log.info('Java project detected. Running Java CI checks...\n');
+    const cwd = process.cwd();
+    const checks: { label: string; pass: boolean; tip?: string }[] = [
+        { label: 'pom.xml exists', pass: fs.existsSync(`${cwd}/pom.xml`), tip: 'A pom.xml is required for Maven projects.' },
+        { label: 'Dockerfile exists', pass: fs.existsSync(`${cwd}/Dockerfile`), tip: 'Run "autoflow init" to generate a Dockerfile.' },
+    ];
+    let failed = false;
+    for (const check of checks) {
+        if (check.pass) { log.success(`  ✔ ${check.label}`); }
+        else { log.error(`  ✘ ${check.label}`); if (check.tip) log.info(`    Tip: ${check.tip}`); failed = true; }
+    }
+    if (failed) throw new AutoFlowError('Java CI checks failed.', EXIT_CODES.CI_FAILED, 'CI');
+    log.success('✔ All Java CI checks passed! Proceeding to deployment...\n');
+}
+
 // ── Public entry point ───────────────────────────────────────────────────────
 export async function runCIChecks(appType: string, strictCI?: boolean): Promise<void> {
     log.header('LOCAL CI CHECKS');
 
-    if (appType === 'static') {
-        runStaticChecks();
-        return;
+    switch (appType) {
+        case 'static':
+            runStaticChecks();
+            return;
+
+        case 'php':
+            runPhpChecks();
+            return;
+
+        case 'django':
+        case 'flask':
+        case 'python':
+            runPythonChecks();
+            return;
+
+        case 'rails':
+        case 'ruby':
+            runRailsChecks();
+            return;
+
+        case 'go':
+            runGoChecks();
+            return;
+
+        case 'java':
+            runJavaChecks();
+            return;
+
+        default:
+            // Node.js / JS frameworks
+            break;
     }
 
     // Node/npm project
@@ -358,6 +517,5 @@ export async function runCIChecks(appType: string, strictCI?: boolean): Promise<
         return;
     }
 
-    // Pass strictCI down
     await runNodeChecks(strictCI);
 }
