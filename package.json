@@ -1,6 +1,6 @@
 {
-  "name": "autoflow-cli",
-  "version": "2.0.0",
+  "name": "autoflow-tech",
+  "version": "1.0.0",
   "description": "Automated CI/CD CLI tool for students and beginners",
   "main": "dist/bin/index.js",
   "bin": {
@@ -25,11 +25,10 @@
     "ssh",
     "cicd"
   ],
-  "author": "",
+  "author": "Keval Parmar",
   "license": "MIT",
   "files": [
     "bin",
-    "src",
     "dist",
     "scripts"
   ],

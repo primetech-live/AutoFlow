@@ -10,7 +10,8 @@ export async function startContainer(
     imageName: string,
     hostPort: string,
     containerPort: number,
-    useDomain: boolean
+    useDomain: boolean,
+    hasEnv: boolean = false
 ): Promise<void> {
     // Stop and remove old container if running
     await ssh.execCommand(`docker rm -f ${containerName} || true`);
@@ -19,16 +20,21 @@ export async function startContainer(
         ? `-p 127.0.0.1:${hostPort}:${containerPort}`
         : `-p ${hostPort}:${containerPort}`;
 
+    const envLine = hasEnv ? '\\\n  --env-file .env \\' : '\\';
+
     log.info(`Port mapping: Host:${hostPort} → Container:${containerPort}`);
-    log.info('Starting container with Z+ environment injection...');
+    if (hasEnv) {
+        log.info('Starting container with Z+ environment injection...');
+    } else {
+        log.info('Starting container...');
+    }
 
     await exec(ssh, `
 cd ${projectDir} && \\
 docker run -d \\
   --restart unless-stopped \\
   ${portBinding} \\
-  --name ${containerName} \\
-  --env-file .env \\
+  --name ${containerName} ${envLine}
   ${imageName}
 `);
 }

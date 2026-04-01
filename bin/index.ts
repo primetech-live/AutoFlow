@@ -22,7 +22,7 @@ console.log(
 program
     .name('autoflow')
     .description('Automated CI/CD CLI tool for students and beginners')
-    .version('2.0.0');
+    .version('1.0.1');
 
 program
     .command('setup')

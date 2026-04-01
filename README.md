@@ -97,6 +97,17 @@ autoflow stop
 
 ---
 
+## 🔒 Security Best Practices
+
+AutoFlow is designed with security in mind to protect your server and project credentials:
+
+- **Environment Variables (.env) Support:** AutoFlow securely parses and manages `.env` files for your sensitive configuration (e.g., API keys, database strings). `.env` files are injected at build/runtime and are securely handled without compromising your public Git repository.
+- **SSH Key Authentication:** Authenticates with your remote server using secure OpenSSH private keys instead of passwords. Your keys remain strictly on your local machine.
+- **Isolated Deployments:** Each application runs in its own isolated Docker container.
+- **Auto-Configured SSL:** Automatic HTTPS via Let's Encrypt ensures encrypted traffic between users and your application out of the box.
+
+---
+
 ## 💡 Troubleshooting
 
 - **Permissions Error (Linux/Mac):** Ensure your private SSH key has proper permissions: `chmod 600 ~/.ssh/id_rsa`.

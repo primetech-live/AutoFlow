@@ -1,0 +1,9 @@
+src/
+tests/
+tsconfig.json
+.vscode/
+
+# Ignore local config files
+autoflow.config.json
+
+# If you decide to remove files from the 'files' array in package.json, this acts as a fallback.
