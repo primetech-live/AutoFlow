@@ -17,6 +17,7 @@ export interface ProjectConfig {
     deploymentType: string;
     mode: 'domain' | 'port';
     strictCI?: boolean;
+    volumes?: string[];
 }
 
 export type MergedConfig = GlobalConfig & ProjectConfig;

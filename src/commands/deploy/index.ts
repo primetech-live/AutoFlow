@@ -71,7 +71,7 @@ async function deploy(): Promise<void> {
             }
 
             // ── Step 10: Start new container ─────────────────────────────────
-            await startContainer(ssh, projectDir, container, image, hostPort, containerPort, !!config.domain, envUnlocked);
+            await startContainer(ssh, projectDir, container, image, hostPort, containerPort, !!config.domain, envUnlocked, config.volumes);
 
             // ── Step 10.5: Cleanup ───────────────────────────────────────────
             if (envUnlocked) {

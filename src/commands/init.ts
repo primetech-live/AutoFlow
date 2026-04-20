@@ -134,6 +134,36 @@ async function init(): Promise<void> {
     log.info('✨ Detected: Static Website');
   }
 
+  /* ── Volume Detection (Persistence) ────────────────────────────── */
+  const suggestedVolumes: string[] = [];
+  const commonDataPaths = ['data', 'database', 'storage', 'uploads'];
+  for (const p of commonDataPaths) {
+    if (fs.existsSync(p)) suggestedVolumes.push(`/${p}`);
+  }
+  // Check for sqlite files in root
+  try {
+    const files = fs.readdirSync(process.cwd());
+    for (const f of files) {
+      if (f.endsWith('.sqlite') || f.endsWith('.db')) {
+        suggestedVolumes.push(`/${f}`);
+      }
+    }
+  } catch { /* ignore */ }
+
+  let volumes: string[] = [];
+  if (suggestedVolumes.length > 0) {
+    log.info(`\n💾 Persistence: AutoFlow detected possible data paths: ${suggestedVolumes.join(', ')}`);
+    const { useVolumes } = await inquirer.prompt<{ useVolumes: boolean }>({
+      type: 'confirm',
+      name: 'useVolumes',
+      message: 'Enable persistent volumes for these paths? (Recommended for databases)',
+      default: true,
+    });
+    if (useVolumes) {
+      volumes = suggestedVolumes;
+    }
+  }
+
   /* ── Save config ─────────────────────────────────────────────────── */
   saveProjectConfig({
     projectName: answers.projectName,
@@ -143,6 +173,7 @@ async function init(): Promise<void> {
     deploymentType: 'docker',
     mode: answers.domain ? 'domain' : 'port',
     strictCI: answers.strictCI,
+    volumes: volumes.length > 0 ? volumes : undefined,
   });
   log.success('autoflow.config.json created ✔');
 
