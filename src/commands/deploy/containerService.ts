@@ -11,7 +11,8 @@ export async function startContainer(
     hostPort: string,
     containerPort: number,
     useDomain: boolean,
-    hasEnv: boolean = false
+    hasEnv: boolean = false,
+    volumes: string[] = []
 ): Promise<void> {
     // Stop and remove old container if running
     await ssh.execCommand(`docker rm -f ${containerName} || true`);
@@ -20,7 +21,28 @@ export async function startContainer(
         ? `-p 127.0.0.1:${hostPort}:${containerPort}`
         : `-p ${hostPort}:${containerPort}`;
 
-    const envLine = hasEnv ? '\\\n  --env-file .env \\' : '\\';
+    const envLine = hasEnv ? '--env-file .env' : '';
+
+    // Prepare volume bindings
+    let volumeBinding = '';
+    if (volumes && volumes.length > 0) {
+        log.info('Preparing persistent volumes...');
+        for (const vol of volumes) {
+            // vol format expected: "hostPath:containerPath" or just "containerPath"
+            // If just containerPath, we map it to projectDir/data/containerPath
+            let [host, container] = vol.includes(':') ? vol.split(':') : [null, vol];
+            
+            if (!host) {
+                // Default to a 'data' directory in project root if not specified
+                const safeDir = container.replace(/^\//, '').replace(/\//g, '_');
+                host = `${projectDir}/data/${safeDir}`;
+            }
+
+            // Ensure host directory exists
+            await ssh.execCommand(`mkdir -p ${host}`);
+            volumeBinding += `-v ${host}:${container} `;
+        }
+    }
 
     log.info(`Port mapping: Host:${hostPort} → Container:${containerPort}`);
     if (hasEnv) {
@@ -29,14 +51,17 @@ export async function startContainer(
         log.info('Starting container...');
     }
 
-    await exec(ssh, `
-cd ${projectDir} && \\
-docker run -d \\
-  --restart unless-stopped \\
-  ${portBinding} \\
-  --name ${containerName} ${envLine}
-  ${imageName}
-`);
+    const runCmd = [
+        'docker run -d',
+        '--restart unless-stopped',
+        portBinding,
+        volumeBinding.trim(),
+        `--name ${containerName}`,
+        envLine,
+        imageName
+    ].filter(Boolean).join(' ');
+
+    await exec(ssh, `cd ${projectDir} && ${runCmd}`);
 }
 
 export async function verifyContainerHealth(

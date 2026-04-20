@@ -466,9 +466,51 @@ function runJavaChecks(): void {
     log.success('✔ All Java CI checks passed! Proceeding to deployment...\n');
 }
 
+// ── Migration Safety Checks ──────────────────────────────────────────────────
+function checkMigrationSafety(): void {
+    const migrationDirs = ['migrations', 'db/migrations', 'database/migrations', 'prisma/migrations'];
+    const destructiveKeywords = [/DROP\s+TABLE/i, /TRUNCATE\s+TABLE/i, /DATABASE\s+RESET/i];
+    
+    log.info('Scanning for destructive database operations in migrations...');
+    
+    let findings: string[] = [];
+    
+    for (const dir of migrationDirs) {
+        const dirPath = path.join(process.cwd(), dir);
+        if (!fs.existsSync(dirPath)) continue;
+        
+        try {
+            const files = fs.readdirSync(dirPath);
+            for (const file of files) {
+                if (file.endsWith('.sql') || file.endsWith('.js') || file.endsWith('.ts')) {
+                    const content = fs.readFileSync(path.join(dirPath, file), 'utf-8');
+                    for (const kw of destructiveKeywords) {
+                        if (kw.test(content)) {
+                            findings.push(`${dir}/${file} (matches ${kw.source})`);
+                        }
+                    }
+                }
+            }
+        } catch { /* ignore */ }
+    }
+    
+    if (findings.length > 0) {
+        log.warning('\n⚠️  POTENTIALLY DESTRUCTIVE MIGRATIONS DETECTED:');
+        findings.forEach(f => log.info(`  - ${f}`));
+        log.info('   Please ensure these are intentional and won\'t wipe production data.\n');
+    } else {
+        log.success('✔ No obviously destructive migrations found.');
+    }
+}
+
 // ── Public entry point ───────────────────────────────────────────────────────
 export async function runCIChecks(appType: string, strictCI?: boolean): Promise<void> {
     log.header('LOCAL CI CHECKS');
+
+    // Run migration safety check for all non-static apps
+    if (appType !== 'static') {
+        checkMigrationSafety();
+    }
 
     switch (appType) {
         case 'static':
