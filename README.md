@@ -1,107 +1,121 @@
-# AutoFlow CLI 🚀
-
-AutoFlow is an automated CI/CD CLI tool designed for students, freelancers, and beginners. It simplifies the deployment process by bridging your local development environment directly to a remote server using Git and Docker, automating complex DevOps tasks like SSL configuration, Reverse Proxy setup, and auto-healing.
-
----
-
-## 🚀 Why AutoFlow?
-
-Modern deployment is complex. **AutoFlow** abstracts away quirks of Linux administration, Docker orchestration, and Nginx configuration behind a simple, unified interface.
-
-- **Automated DevOps**: Replaces manual `ssh`, `git pull`, `pm2`, and `nginx.conf` editing.
-- **Docker-First**: Guarantees your app runs exactly the same on the server as it does locally.
-- **Secure by Default**: Automatically configures HTTPS (SSL) and secure Nginx proxies.
-- **Smart Detection**: Instantly recognizes Next.js, Vite, or Static sites and builds optimal Dockerfiles.
+<div align="center">
+  <h1>🚀 AutoFlow CLI</h1>
+  <p><strong>Automated CI/CD CLI tool designed for students, freelancers, and beginners.</strong></p>
+  <p>
+    <a href="https://www.npmjs.com/package/autoflow-cli"><img src="https://img.shields.io/npm/v/autoflow-cli?color=blue&style=for-the-badge&logo=npm" alt="NPM Version" /></a>
+    <img src="https://img.shields.io/node/v/autoflow-cli?style=for-the-badge" alt="Node Version" />
+    <img src="https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge" alt="License" />
+  </p>
+</div>
 
 ---
 
-## 📦 Features
+## 📖 About AutoFlow
 
-### 1. Smart Initialization (`autoflow init`)
-- **Framework Detection**: Scans your project (detects `next.config.js`, `vite.config.js`, etc.) and generates a production-ready `Dockerfile`.
-- **Zero-Config**: Uses sane defaults for ports and build commands.
+**AutoFlow** simplifies the deployment process by bridging your local development environment directly to a remote server. It automates complex DevOps tasks like Git operations, Docker orchestration, Nginx reverse proxy setup, and SSL configuration.  
 
-### 2. Global Secure Config (`autoflow setup`)
-- **Centralized Credentials**: Store your server IP and SSH keys securely once. No need to re-enter them for every project.
-- **Security**: Uses secure file permissions (`600`) to protect your private keys.
+Abstract away the quirks of Linux administration, Docker configurations, and Nginx setups behind a simple, unified, and beautiful CLI interface!
 
-### 3. Atomic Deployments (`autoflow deploy`)
-- **Swap Management**: Automatically creates Swap memory on low-RAM servers to prevent OOM crashes during builds.
-- **Zero-Downtime**: Builds the new container successfully *before* stopping the old one is theoretically possible (implementation uses rapid swap).
-- **Auto-SSL**: Integrates with **Certbot** to automatically provision valid Let's Encrypt certificates.
-- **Diagnostics**: Runs post-deploy health checks (Curl, Docker status) and streams logs if the container fails to start.
+## ✨ Key Features
 
-### 4. Observability (`autoflow status`)
-- **Real-time Stats**: View CPU and RAM usage of your running container.
-- **Live Logs**: Stream application logs (stdout/stderr) directly to your local terminal.
+- **🤖 Smart Framework Detection:** Automatically detects Next.js, Vite, React, Vue, Node.js or Static sites and prepares an optimal, production-ready `Dockerfile`.
+- **🔐 Secure Global Configuration:** Securely stores your Server IP and SSH credentials globally so you only configure it *once*. Uses strict `600` file permissions.
+- **⚡ Atomic Deployments:** Achieves near-zero downtime deployments with rapid container swapping, plus automatic OOM (Out of Memory) crash prevention by creating Swap space on low-RAM servers.
+- **🔒 Auto SSL (HTTPS):** Automatically requests and configures free Let's Encrypt SSL certificates (via Certbot) when a custom domain is provided.
+- **📊 Real-time Observability:** Instantly view container CPU/RAM stats or stream live application logs (stdout/stderr) right inside your local terminal.
 
 ---
 
 ## 🛠️ Installation
 
+**Requirements:**
+- **Local Machine:** Node.js (v18 or higher)
+- **Remote Server:** A Linux VPS (Ubuntu/Debian recommended) with Docker, Docker Compose, and Git installed.
+
+Install the CLI globally using npm:
+
 ```bash
 npm install -g autoflow-cli
 ```
 
-*Note: Ensure you have `git` and `ssh` available in your terminal.*
-
 ---
 
-## 📖 Usage Guide
+## 🚀 Getting Started
 
-### Step 1: Global Setup (Run Once)
-Configure your VPS details globally so you don't have to repeat them.
+Deploying your app is as easy as running a few simple commands!
+
+### 1️⃣ Global Setup (Run Once)
+Setup your VPS details globally so you never have to re-enter them for other projects.
 ```bash
 autoflow setup
 ```
-*Prompts for: Server IP, SSH Username (e.g., `ubuntu`), SSH Port, and Private Key Path.*
+*(You will be prompted for: Server IP, SSH Username, SSH Port, and SSH Private Key path)*
 
-### Step 2: Initialize Project
-Navigate to your project folder and initialize AutoFlow.
+### 2️⃣ Initialize Project
+Navigate to your project directory and initialize AutoFlow. It will automatically detect your project's framework and set up necessary configurations.
 ```bash
-cd my-nextjs-app
+cd my-awesome-app
 autoflow init
 ```
-*Prompts for: Project Name, Git Repository URL, and Domain (optional). auto-detects framework.*
+*(Prompts for: Project Name, Git Repository URL, and optionally a Domain name)*
 
-### Step 3: Deploy
-Push your code to the server and go live.
+### 3️⃣ Deploy!
+Push your code to Git, build it on the remote server, and deploy it automatically.
 ```bash
 autoflow deploy
 ```
-*What happens:* 
-1. Auto-commits and pushes local changes to Git.
-2. Connects to server via SSH.
-3. Pulls latest code.
-4. Builds Docker image.
-5. Configures Nginx & SSL (if domain provided).
-6. Starts container.
+**What happens under the hood?**
+1. Auto-commits and pushes local changes to your Git repository.
+2. Connects securely to your VPS via SSH.
+3. Pulls the latest code on the server.
+4. Builds a fresh isolated Docker Image.
+5. Configures Nginx and provisions SSL (if domain was configured in `init`).
+6. Boots the new container effortlessly.
 
-### Step 4: Manage
-Check if your app is running smoothly.
+### 4️⃣ Monitor and Manage
+
+Check the live stats (CPU/Memory/Status) of your running container:
 ```bash
 autoflow status
 ```
 
-Stop the application and clean up resources:
+Need to gracefully stop and clean up the application?
 ```bash
 autoflow stop
 ```
 
 ---
 
-## ⚙️ Architecture
+## ⚙️ Architecture Pipeline
 
-AutoFlow operates using a **Local -> Git -> Remote** pipeline:
-1. **Local**: You run `autoflow deploy`. CLI syncs code to your Git provider.
-2. **Remote**: CLI SSHs into your VPS.
-3. **Build**: Pulls code and runs `docker build`.
-4. **Serve**: Creates/Restarts Docker container and updates Nginx rules.
+**AutoFlow operates using a `Local -> Git -> Remote` pipeline:**
+
+1. **Local:** You run `autoflow deploy`. Your local code is synced/pushed automatically to your Git provider (GitHub/GitLab/Bitbucket).
+2. **Remote:** AutoFlow SSHs into your VPS securely from your local machine.
+3. **Build:** The server pulls the latest Git code into a temp directory and executes an optimal Docker build.
+4. **Serve:** Docker containers are created or restarted, and live Nginx routing rules are updated automatically.
 
 ---
 
-## 📝 Prerequisites
+## 🔒 Security Best Practices
 
-- **Local Machine**: Node.js installed.
-- **Remote Server**: A Linux VPS (Ubuntu/Debian recommended) with `docker` and `git` installed.
-- **Domain (Optional)**: If using domain mode, ensure DNS points to your Server IP.
+AutoFlow is designed with security in mind to protect your server and project credentials:
+
+- **Environment Variables (.env) Support:** AutoFlow securely parses and manages `.env` files for your sensitive configuration (e.g., API keys, database strings). `.env` files are injected at build/runtime and are securely handled without compromising your public Git repository.
+- **SSH Key Authentication:** Authenticates with your remote server using secure OpenSSH private keys instead of passwords. Your keys remain strictly on your local machine.
+- **Isolated Deployments:** Each application runs in its own isolated Docker container.
+- **Auto-Configured SSL:** Automatic HTTPS via Let's Encrypt ensures encrypted traffic between users and your application out of the box.
+
+---
+
+## 💡 Troubleshooting
+
+- **Permissions Error (Linux/Mac):** Ensure your private SSH key has proper permissions: `chmod 600 ~/.ssh/id_rsa`.
+- **Node Version:** Ensure you're running Node.js `>= 18`. You can check with `node -v`.
+- **Server Memory:** If deployments fail unexpectedly during build, ensure your VPS has at least 1GB of RAM or available swap space (AutoFlow tries to allocate swap automatically but some hosts restrict this).
+
+---
+
+## 📜 License
+
+This project is licensed under the MIT License.

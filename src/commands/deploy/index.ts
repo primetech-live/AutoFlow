@@ -58,6 +58,7 @@ async function deploy(): Promise<void> {
 
             // ── Step 9.5: Environment Sync & Unlock (Z+ Security) ────────────
             const vault = loadVaultConfig();
+            let envUnlocked = false;
 
             if (vault) {
                 // This will prompt for Password + OTP
@@ -65,14 +66,15 @@ async function deploy(): Promise<void> {
 
                 if (password) {
                     await unlockEnvOnServer(ssh, projectDir, password, vault.salt);
+                    envUnlocked = true;
                 }
             }
 
             // ── Step 10: Start new container ─────────────────────────────────
-            await startContainer(ssh, projectDir, container, image, hostPort, containerPort, !!config.domain);
+            await startContainer(ssh, projectDir, container, image, hostPort, containerPort, !!config.domain, envUnlocked);
 
             // ── Step 10.5: Cleanup ───────────────────────────────────────────
-            if (vault) {
+            if (envUnlocked) {
                 await cleanupEnv(ssh, projectDir);
             }
 
