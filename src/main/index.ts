@@ -1,0 +1,82 @@
+import { app, BrowserWindow, dialog } from 'electron';
+import path from 'path';
+import { registerIpcHandlers } from './ipc';
+import { deployerEngine } from '../core/deployer';
+
+let mainWindow: BrowserWindow | null = null;
+const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+
+function createWindow() {
+    mainWindow = new BrowserWindow({
+        width: 1200,
+        height: 800,
+        minWidth: 950,
+        minHeight: 650,
+        frame: false, // frameless window for Matte Graphite custom titlebar
+        backgroundColor: '#141416',
+        show: false,
+        webPreferences: {
+            preload: path.join(__dirname, '../preload/index.js'),
+            nodeIntegration: false,
+            contextIsolation: true,
+            sandbox: true
+        }
+    });
+
+    // Register IPC channels
+    registerIpcHandlers(mainWindow);
+
+    if (isDev) {
+        mainWindow.loadURL('http://localhost:5173');
+        // Open DevTools in dev mode
+        mainWindow.webContents.openDevTools();
+    } else {
+        mainWindow.loadFile(path.join(__dirname, '../../renderer/index.html'));
+    }
+
+    mainWindow.once('ready-to-show', () => {
+        mainWindow?.show();
+    });
+
+    // Intercept close event to check for active deployments
+    mainWindow.on('close', (e) => {
+        if (deployerEngine.hasActiveDeployments()) {
+            e.preventDefault();
+            const choice = dialog.showMessageBoxSync(mainWindow!, {
+                type: 'warning',
+                buttons: ['Cancel', 'Exit Anyway'],
+                title: 'Active Deployment Running',
+                message: 'A project deployment is currently running in the background.',
+                detail: 'If you exit now, the logging stream will be disconnected and the deployment may remain in an unverified state on the server. Are you sure you want to exit?',
+                defaultId: 0,
+                cancelId: 0
+            });
+
+            if (choice === 1) {
+                // Remove listener so it closes cleanly
+                mainWindow?.removeAllListeners('close');
+                mainWindow?.close();
+            }
+        }
+    });
+
+    mainWindow.on('closed', () => {
+        mainWindow = null;
+    });
+}
+
+app.whenReady().then(() => {
+    createWindow();
+
+    app.on('activate', () => {
+        if (BrowserWindow.getAllWindows().length === 0) {
+            createWindow();
+        }
+    });
+});
+
+app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') {
+        app.quit();
+    }
+});

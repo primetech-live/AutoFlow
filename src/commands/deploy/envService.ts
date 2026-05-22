@@ -5,6 +5,7 @@ import log from '../../utils/logger';
 import { loadVaultConfig, encrypt, verifyOTP, hashPassword } from '../../utils/vaultService';
 import { AutoFlowError, EXIT_CODES, exec } from './errors';
 import inquirer from 'inquirer';
+import { vaultEngine } from '../../core/vault';
 
 /**
  * Handles the secure traversal of environment variables
@@ -17,8 +18,6 @@ export async function syncEnv(ssh: NodeSSH, projectDir: string): Promise<string 
         return null;
     }
 
-    log.header('Z+ SECURITY CHALLENGE');
-
     const vault = loadVaultConfig();
     if (!vault) {
         throw new AutoFlowError(
@@ -28,30 +27,40 @@ export async function syncEnv(ssh: NodeSSH, projectDir: string): Promise<string 
         );
     }
 
-    // 1. Password Challenge
-    const { password } = await inquirer.prompt([{
-        type: 'password',
-        name: 'password',
-        message: 'Enter Master Deployment Password:',
-        mask: '*'
-    }]);
+    let password = '';
+    const sessionPassword = vaultEngine.getSessionPassword();
+    if (sessionPassword) {
+        password = sessionPassword;
+        log.success('✔ Identity verified from active vault session. Encrypting payload...');
+    } else {
+        log.header('Z+ SECURITY CHALLENGE');
 
-    if (hashPassword(password, vault.salt) !== vault.passwordHash) {
-        throw new AutoFlowError('Incorrect master password.', EXIT_CODES.CI_FAILED, 'vault');
+        // 1. Password Challenge
+        const answers = await inquirer.prompt([{
+            type: 'password',
+            name: 'password',
+            message: 'Enter Master Deployment Password:',
+            mask: '*'
+        }]);
+        password = answers.password;
+
+        if (hashPassword(password, vault.salt) !== vault.passwordHash) {
+            throw new AutoFlowError('Incorrect master password.', EXIT_CODES.CI_FAILED, 'vault');
+        }
+
+        // 2. OTP Challenge
+        const { token } = await inquirer.prompt([{
+            type: 'input',
+            name: 'token',
+            message: 'Enter 6-digit OTP from your phone:',
+        }]);
+
+        if (!verifyOTP(token, vault.totpSecret)) {
+            throw new AutoFlowError('Invalid OTP code.', EXIT_CODES.CI_FAILED, 'vault');
+        }
+
+        log.success('✔ Z+ Identity Verified. Encrypting payload...');
     }
-
-    // 2. OTP Challenge
-    const { token } = await inquirer.prompt([{
-        type: 'input',
-        name: 'token',
-        message: 'Enter 6-digit OTP from your phone:',
-    }]);
-
-    if (!verifyOTP(token, vault.totpSecret)) {
-        throw new AutoFlowError('Invalid OTP code.', EXIT_CODES.CI_FAILED, 'vault');
-    }
-
-    log.success('✔ Z+ Identity Verified. Encrypting payload...');
 
     // 3. Encrypt & Prep Traversal
     const envContent = fs.readFileSync(envPath, 'utf-8');

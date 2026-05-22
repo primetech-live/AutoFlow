@@ -1,0 +1,233 @@
+import React, { useState, useEffect } from 'react';
+import { SuccessIcon, WarningIcon, SyncIcon, TrashIcon } from '../components/Icons';
+
+interface SettingsProps {
+    onReRunOnboarding: () => void;
+    onResetConfig: () => void;
+}
+
+export const Settings: React.FC<SettingsProps> = ({ onReRunOnboarding, onResetConfig }) => {
+    // Config states
+    const [serverIp, setServerIp] = useState('');
+    const [sshUser, setSshUser] = useState('');
+    const [sshPort, setSshPort] = useState('22');
+    const [sshKeyPath, setSshKeyPath] = useState('');
+
+    const [loading, setLoading] = useState(false);
+    const [saveStatus, setSaveStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+    // Fetch existing settings on load
+    useEffect(() => {
+        const fetchConfig = async () => {
+            try {
+                const config = await window.autoflow.loadGlobalConfig();
+                if (config) {
+                    setServerIp(config.serverIp || '');
+                    setSshUser(config.sshUser || '');
+                    setSshPort(config.sshPort || '22');
+                    setSshKeyPath(config.sshKeyPath || '');
+                }
+            } catch (err: any) {
+                // Ignore missing config or failure on start
+            }
+        };
+        fetchConfig();
+    }, []);
+
+    const handleBrowseKey = async () => {
+        try {
+            const filepath = await window.autoflow.browseFile();
+            if (filepath) {
+                setSshKeyPath(filepath);
+            }
+        } catch {
+            // Cancelled browse
+        }
+    };
+
+    const handleSaveConfig = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setLoading(true);
+        setSaveStatus(null);
+
+        if (!serverIp || !sshUser || !sshPort || !sshKeyPath) {
+            setSaveStatus({ type: 'error', message: 'All server parameters are required.' });
+            setLoading(false);
+            return;
+        }
+
+        try {
+            await window.autoflow.saveGlobalConfig({
+                serverIp,
+                sshUser,
+                sshPort,
+                sshKeyPath
+            });
+            setSaveStatus({ type: 'success', message: 'Server configuration saved successfully.' });
+        } catch (err: any) {
+            setSaveStatus({ type: 'error', message: err.message || 'Failed to save configuration.' });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleReRunOnboardingClick = () => {
+        const confirm = window.confirm(
+            'Are you sure you want to re-run onboarding? This will clear the active connection settings and log you out.'
+        );
+        if (confirm) {
+            onReRunOnboarding();
+        }
+    };
+
+    const handleResetAllClick = () => {
+        const confirm = window.confirm(
+            'WARNING: This will perform a complete system factory reset. It will delete all connection details, lock the vault database, and clear the saved projects list. This action cannot be undone.\n\nAre you sure you want to proceed?'
+        );
+        if (confirm) {
+            onResetConfig();
+        }
+    };
+
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', flex: 1, overflowY: 'auto', paddingRight: '4px' }}>
+            <div>
+                <h1 className="h1">Settings</h1>
+                <span className="text-secondary" style={{ fontSize: '13px' }}>Manage server connections, onboarding settings, and system state</span>
+            </div>
+
+            <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+                {/* Left card: Edit Server Connection */}
+                <div className="card" style={{ flex: 2, minWidth: '400px' }}>
+                    <h3 className="h2" style={{ fontSize: '16px', marginBottom: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px' }}>
+                        VPS Server Configuration
+                    </h3>
+
+                    {saveStatus && (
+                        <div style={{
+                            background: saveStatus.type === 'success' ? 'var(--accent-glow)' : 'var(--error-glow)',
+                            border: `1px solid ${saveStatus.type === 'success' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`,
+                            color: saveStatus.type === 'success' ? 'var(--accent)' : 'var(--error)',
+                            padding: '10px 14px',
+                            borderRadius: '6px',
+                            fontSize: '12.5px',
+                            marginBottom: '20px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                        }}>
+                            {saveStatus.type === 'success' ? <SuccessIcon size={14} /> : <WarningIcon size={14} />} {saveStatus.message}
+                        </div>
+                    )}
+
+                    <form onSubmit={handleSaveConfig} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label className="form-label">Server IP Address</label>
+                            <input
+                                type="text"
+                                required
+                                placeholder="192.168.1.100"
+                                className="input"
+                                value={serverIp}
+                                onChange={(e) => setServerIp(e.target.value)}
+                            />
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '16px' }}>
+                            <div className="form-group" style={{ flex: 2, marginBottom: 0 }}>
+                                <label className="form-label">SSH Username</label>
+                                <input
+                                    type="text"
+                                    required
+                                    placeholder="root"
+                                    className="input"
+                                    value={sshUser}
+                                    onChange={(e) => setSshUser(e.target.value)}
+                                />
+                            </div>
+                            <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
+                                <label className="form-label">SSH Port</label>
+                                <input
+                                    type="text"
+                                    required
+                                    placeholder="22"
+                                    className="input"
+                                    value={sshPort}
+                                    onChange={(e) => setSshPort(e.target.value)}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="form-group" style={{ marginBottom: '12px' }}>
+                            <label className="form-label">SSH Private Key Path</label>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <input
+                                    type="text"
+                                    required
+                                    placeholder="C:\Users\username\.ssh\id_rsa"
+                                    className="input"
+                                    value={sshKeyPath}
+                                    onChange={(e) => setSshKeyPath(e.target.value)}
+                                    style={{ flex: 1 }}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={handleBrowseKey}
+                                    className="btn btn-secondary"
+                                >
+                                    Browse
+                                </button>
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="btn btn-primary"
+                                style={{ padding: '10px 24px' }}
+                            >
+                                {loading ? 'Saving...' : 'Save Configuration'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                {/* Right card: System Maintenance & Danger Zone */}
+                <div style={{ flex: 1, minWidth: '300px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    <div className="card">
+                        <h3 className="h2" style={{ fontSize: '15px', marginBottom: '12px' }}>
+                            Onboarding Assistant
+                        </h3>
+                        <p className="text-secondary" style={{ fontSize: '12.5px', lineHeight: '1.5', marginBottom: '16px' }}>
+                            Wipe server profiles cached in this session and restart the Step-by-Step server onboarding setup.
+                        </p>
+                        <button
+                            onClick={handleReRunOnboardingClick}
+                            className="btn btn-secondary"
+                            style={{ width: '100%', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                        >
+                            <SyncIcon size={14} /> Re-run Onboarding
+                        </button>
+                    </div>
+
+                    <div className="card" style={{ border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+                        <h3 className="h2" style={{ fontSize: '15px', marginBottom: '12px', color: 'var(--error)' }}>
+                            Danger Zone
+                        </h3>
+                        <p className="text-secondary" style={{ fontSize: '12.5px', lineHeight: '1.5', marginBottom: '16px' }}>
+                            Perform a full factory reset. This deletes server keys, encryption vaults, credentials, and imported project paths from your computer.
+                        </p>
+                        <button
+                            onClick={handleResetAllClick}
+                            className="btn btn-danger"
+                            style={{ width: '100%', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                        >
+                            <TrashIcon size={14} /> Reset Configuration
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
