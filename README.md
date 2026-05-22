@@ -2,8 +2,8 @@
   <h1>🚀 AutoFlow CLI</h1>
   <p><strong>Automated CI/CD CLI tool designed for students, freelancers, and beginners.</strong></p>
   <p>
-    <a href="https://www.npmjs.com/package/autoflow-cli"><img src="https://img.shields.io/npm/v/autoflow-cli?color=blue&style=for-the-badge&logo=npm" alt="NPM Version" /></a>
-    <img src="https://img.shields.io/node/v/autoflow-cli?style=for-the-badge" alt="Node Version" />
+    <a href="https://www.npmjs.com/package/autoflow-cli"><img src="https://img.shields.io/npm/v/autoflow-tech?color=blue&style=for-the-badge&logo=npm" alt="NPM Version" /></a>
+    <img src="https://img.shields.io/node/v/autoflow-tech?style=for-the-badge" alt="Node Version" />
     <img src="https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge" alt="License" />
   </p>
 </div>
