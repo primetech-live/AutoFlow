@@ -20,9 +20,12 @@ import {
 
 import { vaultEngine } from '../core/vault';
 import { projectScanner } from '../core/scanner';
+import { initProjectCore } from '../core/initializer';
 import { deployerEngine } from '../core/deployer';
 import { monitorEngine } from '../core/monitor';
-
+import { connectionManager } from '../core/connection';
+import { installerEngine } from '../core/installer';
+import { addLogListener, removeLogListener, LogType } from '../utils/logger';
 export function registerIpcHandlers(mainWindow: BrowserWindow) {
     // Window Controls
     ipcMain.on('window:minimize', () => {
@@ -92,12 +95,26 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
         return vaultEngine.setupVault(password, totpSecret);
     });
 
-    ipcMain.handle('vault:unlock', (_, password, otpToken) => {
-        return vaultEngine.unlock(password, otpToken);
+    ipcMain.handle('vault:lock', () => {
+        vaultEngine.lock();
+        // Disconnect SSH when session locks — will reconnect on next unlock
+        connectionManager.disconnect();
+        return true;
     });
 
-    ipcMain.handle('vault:lock', () => {
-        return vaultEngine.lock();
+    ipcMain.handle('vault:unlock', async (_, password, otpToken) => {
+        const success = vaultEngine.unlock(password, otpToken);
+        if (success) {
+            // Re-establish the persistent SSH session after successful unlock
+            try {
+                const config = loadGlobalConfig();
+                await connectionManager.connect(config);
+            } catch (err: any) {
+                console.error('[IPC] SSH reconnect after unlock failed:', err.message);
+                // Don't throw — vault is unlocked, SSH will retry via auto-reconnect
+            }
+        }
+        return success;
     });
 
     ipcMain.handle('vault:is-unlocked', () => {
@@ -220,10 +237,91 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
         return projectConfigExists(projectPath);
     });
 
-    // Deploy actions
+    ipcMain.handle('projects:init', async (_, projectPath, options) => {
+        mainWindow.webContents.send('init:started', { projectName: options.projectName, startTime: Date.now() });
+
+        const logListener = (type: LogType, message: string) => {
+            mainWindow.webContents.send('init:log', {
+                projectName: options.projectName,
+                timestamp: Date.now(),
+                type,
+                message,
+                step: 'Initialize'
+            });
+        };
+
+        addLogListener(logListener);
+
+        try {
+            await initProjectCore(projectPath, options);
+            mainWindow.webContents.send('init:success', { projectName: options.projectName });
+            return { success: true };
+        } catch (error: any) {
+            mainWindow.webContents.send('init:failed', { projectName: options.projectName, error: error.message });
+            return { success: false, error: error.message };
+        } finally {
+            removeLogListener(logListener);
+        }
+    });
+
+    // Deploy actions — run deployProjectCore directly in the main process and stream logs
     ipcMain.handle('deploy:run', async (_, projectPath) => {
-        // Runs asynchronously in background; errors are handled via events
-        deployerEngine.deploy(projectPath).catch(() => {});
+        const deployProjectCore = require('../commands/deploy/index').default;
+        const { loadProjectConfig } = require('../core/config');
+        const startTime = Date.now();
+
+        let projectName = path.basename(projectPath);
+        try {
+            const cfg = loadProjectConfig(projectPath);
+            projectName = cfg.projectName || projectName;
+        } catch { /* use basename fallback */ }
+
+        // Stream every log line straight to the renderer terminal
+        const logListener = (type: LogType, message: string) => {
+            if (!mainWindow.isDestroyed()) {
+                mainWindow.webContents.send('deploy:log', { type, message });
+            }
+        };
+        addLogListener(logListener);
+
+        const originalCwd = process.cwd();
+        try {
+            process.chdir(projectPath);
+            await deployProjectCore(true); // isDesktop = true (keeps SSH alive, throws on error)
+            process.chdir(originalCwd);
+            removeLogListener(logListener);
+
+            // Save history
+            deployerEngine.saveHistoryItem(projectName, {
+                id: `dep-${Date.now()}`,
+                sequence: deployerEngine.getHistory(projectName).length + 1,
+                timestamp: Date.now(),
+                duration: Math.round((Date.now() - startTime) / 1000),
+                status: 'Live',
+                notes: 'Successful deployment',
+                commitSha: (() => {
+                    try { return require('child_process').execSync('git rev-parse --short HEAD', { cwd: projectPath, encoding: 'utf8' }).trim(); } catch { return 'N/A'; }
+                })()
+            });
+
+            if (!mainWindow.isDestroyed()) mainWindow.webContents.send('deploy:success', {});
+        } catch (err: any) {
+            process.chdir(originalCwd);
+            removeLogListener(logListener);
+
+            deployerEngine.saveHistoryItem(projectName, {
+                id: `dep-${Date.now()}`,
+                sequence: deployerEngine.getHistory(projectName).length + 1,
+                timestamp: Date.now(),
+                duration: Math.round((Date.now() - startTime) / 1000),
+                status: 'Failed',
+                notes: err.message,
+                commitSha: 'N/A'
+            });
+
+            if (!mainWindow.isDestroyed()) mainWindow.webContents.send('deploy:failed', { error: err.message });
+        }
+
         return { success: true };
     });
 
@@ -301,8 +399,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
     // Server Stats Monitor
     ipcMain.handle('server:fetch-stats', async () => {
         try {
-            const config = loadGlobalConfig();
-            return await monitorEngine.fetchStats(config);
+            return await monitorEngine.fetchStats();
         } catch (err: any) {
             throw new Error(err.message || 'Failed to fetch server statistics.');
         }
@@ -310,31 +407,66 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
 
     ipcMain.handle('server:fetch-remote-logs', async (_, name) => {
         try {
-            const config = loadGlobalConfig();
-            return await monitorEngine.fetchRemoteLogs(config, name);
+            return await monitorEngine.fetchRemoteLogs(name);
         } catch (err: any) {
             return `Failed to fetch remote logs: ${err.message}`;
         }
     });
 
-    // Listen to Core Engines & Emit to Renderer
-    deployerEngine.on('deploy:started', (data) => {
-        if (!mainWindow.isDestroyed()) mainWindow.webContents.send('deploy:started', data);
+    // Container Controls
+    ipcMain.handle('monitor:stop-container', async (_, name) => {
+        return await monitorEngine.stopContainer(name);
     });
 
-    deployerEngine.on('deploy:log', (data) => {
-        if (!mainWindow.isDestroyed()) mainWindow.webContents.send('deploy:log', data);
+    ipcMain.handle('monitor:restart-container', async (_, name) => {
+        return await monitorEngine.restartContainer(name);
     });
 
-    deployerEngine.on('deploy:success', (data) => {
-        if (!mainWindow.isDestroyed()) mainWindow.webContents.send('deploy:success', data);
+    ipcMain.handle('monitor:delete-container', async (_, name) => {
+        return await monitorEngine.deleteContainer(name);
     });
 
-    deployerEngine.on('deploy:failed', (data) => {
-        if (!mainWindow.isDestroyed()) mainWindow.webContents.send('deploy:failed', data);
+    // Connection Manager
+    ipcMain.handle('connection:get-state', () => {
+        return connectionManager.getState();
+    });
+
+    ipcMain.handle('connection:connect', async () => {
+        try {
+            const config = loadGlobalConfig();
+            await connectionManager.connect(config);
+            return { success: true };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    });
+
+    // Intentional disconnect — only used when settings change or factory reset.
+    // Do NOT call this for normal app usage; SSH must stay persistent.
+    ipcMain.handle('connection:disconnect', async () => {
+        await connectionManager.disconnect();
+        return { success: true };
+    });
+
+    // Dependency Installer
+    ipcMain.handle('installer:check-dependencies', async () => {
+        const pkgManager = await installerEngine.detectPackageManager();
+        const deps = await installerEngine.checkDependencies();
+        return { pkgManager, deps };
+    });
+
+    ipcMain.handle('installer:install-dependencies', async (_, depsToInstall, pkgManager) => {
+        await installerEngine.installMissing(depsToInstall, pkgManager, (logMsg) => {
+            if (!mainWindow.isDestroyed()) mainWindow.webContents.send('installer:log', logMsg);
+        });
+        return { success: true };
     });
 
     vaultEngine.on('lock-state-change', (locked) => {
         if (!mainWindow.isDestroyed()) mainWindow.webContents.send('vault:locked-state-change', locked);
+    });
+
+    connectionManager.on('state-changed', (state) => {
+        if (!mainWindow.isDestroyed()) mainWindow.webContents.send('connection:state-changed', state);
     });
 }

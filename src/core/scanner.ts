@@ -73,8 +73,14 @@ export class ProjectScanner {
                 // Check if this directory is a project
                 const hasConfig = fs.existsSync(path.join(dirPath, 'autoflow.config.json'));
                 const hasPackageJson = fs.existsSync(path.join(dirPath, 'package.json'));
+                const hasIndexHtml = fs.existsSync(path.join(dirPath, 'index.html'));
+                const hasIndexPhp = fs.existsSync(path.join(dirPath, 'index.php')) || fs.existsSync(path.join(dirPath, 'public/index.php'));
+                const hasGoMod = fs.existsSync(path.join(dirPath, 'go.mod'));
+                const hasRequirements = fs.existsSync(path.join(dirPath, 'requirements.txt'));
+                const hasGemfile = fs.existsSync(path.join(dirPath, 'Gemfile'));
+                const hasPom = fs.existsSync(path.join(dirPath, 'pom.xml'));
 
-                if (hasConfig || hasPackageJson) {
+                if (hasConfig || hasPackageJson || hasIndexHtml || hasIndexPhp || hasGoMod || hasRequirements || hasGemfile || hasPom) {
                     let projectName = path.basename(dirPath);
                     let appType = 'node';
                     let gitRepo = '';

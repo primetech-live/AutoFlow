@@ -13,7 +13,7 @@ function copyFile(src, dest) {
 
 try {
     // Copy icon to output dist directory if present
-    copyFile('src/renderer/assets/icon.png', 'dist/renderer/assets/icon.png');
+    copyFile('src/renderer/assets/icon-1.png', 'dist/renderer/assets/icon-1.png');
     console.log("✅ Asset copy complete!");
 } catch (e) {
     console.error("❌ Error copying assets:", e.message);

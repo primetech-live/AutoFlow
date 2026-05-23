@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 
-export type LogType = 'info' | 'success' | 'warning' | 'error' | 'header';
+export type LogType = 'info' | 'success' | 'warning' | 'error' | 'header' | 'stream';
 type LogListener = (type: LogType, message: string) => void;
 
 const listeners = new Set<LogListener>();
@@ -22,23 +22,27 @@ function broadcast(type: LogType, msg: string) {
 const log = {
     info: (msg: string): void => {
         console.log(chalk.blue('ℹ') + ' ' + msg);
-        broadcast('info', msg);
+        broadcast('info', `ℹ ${msg}`);
     },
     success: (msg: string): void => {
         console.log(chalk.green('✔') + ' ' + msg);
-        broadcast('success', msg);
+        broadcast('success', `✔ ${msg}`);
     },
     warning: (msg: string): void => {
         console.log(chalk.yellow('⚠') + ' ' + msg);
-        broadcast('warning', msg);
+        broadcast('warning', `⚠ ${msg}`);
     },
     error: (msg: string): void => {
         console.log(chalk.red('✖') + ' ' + msg);
-        broadcast('error', msg);
+        broadcast('error', `✖ ${msg}`);
     },
     header: (msg: string): void => {
         console.log(chalk.bold.cyan('\n' + msg + '\n'));
-        broadcast('header', msg);
+        broadcast('header', `\n${msg}\n`);
+    },
+    stream: (msg: string): void => {
+        process.stdout.write(msg); // print without newline
+        broadcast('stream', msg);
     }
 };
 

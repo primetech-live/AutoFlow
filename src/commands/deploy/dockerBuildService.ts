@@ -14,7 +14,7 @@ export async function buildDockerImage(
         await exec(ssh, `
 cd ${projectDir} &&
 docker build --no-cache --progress=plain -t ${imageName} .
-`, 600_000); // 10-minute timeout for large builds
+`, 600_000, true); // 10-minute timeout for large builds, with streaming logs
 
         log.success(`Docker image built: ${imageName} ✔`);
     } catch (err) {

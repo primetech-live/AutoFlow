@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { LockIcon, WarningIcon } from '../components/Icons';
+import appIcon from '../../assets/icon-1.png';
 
 interface LockScreenProps {
     onUnlockSuccess: () => void;
+    onResetRequest?: () => void;
 }
 
-export const LockScreen: React.FC<LockScreenProps> = ({ onUnlockSuccess }) => {
+export const LockScreen: React.FC<LockScreenProps> = ({ onUnlockSuccess, onResetRequest }) => {
     const [password, setPassword] = useState('');
     const [otp, setOtp] = useState('');
     const [error, setError] = useState('');
@@ -54,18 +56,12 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlockSuccess }) => {
                 alignItems: 'center'
             }}>
                 <div style={{
-                    background: 'var(--accent-glow)',
-                    border: '1px solid rgba(16, 185, 129, 0.3)',
-                    color: 'var(--accent)',
-                    width: '64px',
-                    height: '64px',
-                    borderRadius: '50%',
+                    marginBottom: '20px',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    marginBottom: '20px'
+                    justifyContent: 'center'
                 }}>
-                    <LockIcon size={28} />
+                    <img src={appIcon} alt="Autoflow Icon" style={{ width: '80px', height: '80px', borderRadius: '16px' }} />
                 </div>
                 
                 <h2 className="h2" style={{ marginBottom: '8px', textAlign: 'center' }}>Session Locked</h2>
@@ -128,6 +124,18 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlockSuccess }) => {
                     >
                         {loading ? 'Verifying...' : 'Unlock Platform'}
                     </button>
+                    
+                    {onResetRequest && (
+                        <div style={{ textAlign: 'center', marginTop: '16px' }}>
+                            <a 
+                                href="#" 
+                                onClick={(e) => { e.preventDefault(); onResetRequest(); }}
+                                style={{ fontSize: '12px', color: 'var(--text-muted)', textDecoration: 'underline', cursor: 'pointer' }}
+                            >
+                                Forgot password? Reset everything
+                            </a>
+                        </div>
+                    )}
                 </form>
             </div>
             

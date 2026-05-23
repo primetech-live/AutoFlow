@@ -16,6 +16,12 @@ import {
     ServerIcon
 } from '../components/Icons';
 
+declare global {
+    interface Window {
+        autoflow: any;
+    }
+}
+
 export interface ScannedProject {
     projectName: string;
     projectPath: string;
@@ -33,7 +39,7 @@ interface DashboardProps {
     onSelectProject: (project: ScannedProject, tab?: 'overview' | 'env' | 'history' | 'logs' | 'monitor') => void;
     onImportProject: (path: string) => void;
     onRemoveProject: (path: string) => void;
-    onTriggerDeploy: (path: string) => void;
+    onTriggerDeploy: (path: string, projectName: string) => void;
     activeDeploy: { projectName: string; status: string; step: string } | null;
 }
 
@@ -64,7 +70,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
     useEffect(() => {
         const fetchHistory = async () => {
             const list: any[] = [];
-            for (const p of projects) {
+            const allProjects = [...projects, ...externalProjects];
+            for (const p of allProjects) {
                 try {
                     const hist = await window.autoflow.getHistory(p.projectName);
                     hist.forEach((h: any) => {
@@ -82,10 +89,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
             list.sort((a, b) => b.timestamp - a.timestamp);
             setRecentActivity(list.slice(0, 5));
         };
-        if (projects.length > 0) {
+        if (projects.length > 0 || externalProjects.length > 0) {
             fetchHistory();
         }
-    }, [projects, activeDeploy]);
+    }, [projects, externalProjects, activeDeploy]);
 
     const handleBrowseFolder = async () => {
         const folder = await window.autoflow.browseFolder();
@@ -101,18 +108,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
         setScanProgress({ count: 0, dir: '' });
 
         // Set up scanner listeners
-        window.autoflow.onScanProjectFound((project) => {
+        window.autoflow.onScanProjectFound((project: any) => {
             setScannedProjects(prev => {
                 if (prev.some(p => p.projectPath === project.projectPath)) return prev;
                 return [...prev, project];
             });
         });
 
-        window.autoflow.onScanProgress((progress) => {
+        window.autoflow.onScanProgress((progress: any) => {
             setScanProgress({ count: progress.count, dir: progress.dir });
         });
 
-        window.autoflow.onScanFinished((allFound) => {
+        window.autoflow.onScanFinished((allFound: any) => {
             setScanning(false);
         });
 
@@ -128,6 +135,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const handleImportScanned = (project: ScannedProject) => {
         onImportProject(project.projectPath);
         setScannedProjects(prev => prev.filter(p => p.projectPath !== project.projectPath));
+        setShowScanModal(false);
     };
 
     // Filter projects
@@ -256,8 +264,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                                 
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                     <span className={`project-status-dot ${isDeploying ? 'live' : (p.status === 'Live' ? 'live' : p.status === 'Failed' ? 'failed' : 'idle')}`} />
-                                                    <span style={{ fontSize: '12px', fontWeight: 600, color: isDeploying ? 'var(--accent)' : 'var(--text-primary)' }}>
-                                                        {isDeploying ? 'Deploying...' : (p.status || 'Idle')}
+                                                    <span style={{ fontSize: '12px', fontWeight: 600, color: isDeploying ? 'var(--warning)' : (p.status === 'Live' ? 'var(--accent)' : 'var(--text-secondary)') }}>
+                                                        {isDeploying ? 'Deploying...' : (p.status === 'Live' ? 'Connected' : p.status === 'Failed' ? 'Failed' : 'Ready To Deploy')}
                                                     </span>
                                                 </div>
                                             </div>
@@ -287,7 +295,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                                 </button>
                                                 
                                                 <button
-                                                    onClick={() => onTriggerDeploy(p.projectPath)}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onTriggerDeploy(p.projectPath, p.projectName);
+                                                    }}
                                                     disabled={isDeploying || !p.hasConfig}
                                                     className="btn btn-primary"
                                                     style={{ flex: 1, padding: '6px 12px', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
@@ -382,8 +393,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                                 
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                     <span className="project-status-dot live" />
-                                                    <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent)' }}>
-                                                        Live
+                                                    <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--info)' }}>
+                                                        Live Only
                                                     </span>
                                                 </div>
                                             </div>
@@ -494,7 +505,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                                     <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{activity.projectName}</span>
                                     <span style={{
-                                        color: activity.status === 'Live' ? 'var(--accent)' : 'var(--error)',
+                                        color: activity.status === 'Live' || activity.status === 'Restarted' ? 'var(--accent)' :
+                                               activity.status === 'Stopped' ? 'var(--warning)' : 
+                                               'var(--error)',
                                         fontWeight: 700,
                                         fontSize: '11px'
                                     }}>
@@ -580,7 +593,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                     borderRadius: '6px'
                                 }}>
                                     {scannedProjects.length === 0 ? (
-                                        <div style={{ padding: '20px', textAlignment: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
+                                        <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
                                             No project directories scanned yet. Specify root folder and start scan.
                                         </div>
                                     ) : (

@@ -2,6 +2,8 @@ import { app, BrowserWindow, dialog } from 'electron';
 import path from 'path';
 import { registerIpcHandlers } from './ipc';
 import { deployerEngine } from '../core/deployer';
+import { connectionManager } from '../core/connection';
+import { globalConfigExists, loadGlobalConfig } from '../core/config';
 
 let mainWindow: BrowserWindow | null = null;
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
@@ -12,7 +14,7 @@ function createWindow() {
         height: 800,
         minWidth: 950,
         minHeight: 650,
-        frame: false, // frameless window for Matte Graphite custom titlebar
+        frame: false,
         backgroundColor: '#141416',
         show: false,
         webPreferences: {
@@ -65,7 +67,7 @@ function createWindow() {
     });
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
     createWindow();
 
     app.on('activate', () => {
@@ -73,6 +75,16 @@ app.whenReady().then(() => {
             createWindow();
         }
     });
+
+    // Auto-connect to server if onboarding is complete
+    if (globalConfigExists()) {
+        try {
+            const config = loadGlobalConfig();
+            await connectionManager.connect(config);
+        } catch (err) {
+            console.error('[Main] Auto-connect failed:', err);
+        }
+    }
 });
 
 app.on('window-all-closed', () => {

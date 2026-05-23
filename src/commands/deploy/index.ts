@@ -16,7 +16,7 @@ import { syncEnv, unlockEnvOnServer, cleanupEnv } from './envService';
 import { loadVaultConfig } from '../../utils/vaultService';
 import inquirer from 'inquirer';
 
-async function deploy(): Promise<void> {
+async function deploy(isDesktop: boolean = false): Promise<void> {
     // Top-level catch — ensures NO raw stack traces ever reach the user
     try {
         // ── Step 1: Load config ──────────────────────────────────────────────
@@ -38,7 +38,7 @@ async function deploy(): Promise<void> {
         await waitForRemoteCI(config.gitRepo, sha, config.strictCI);
 
         // ── Step 5: SSH Connect ──────────────────────────────────────────────
-        const ssh = await connectSSH(config);
+        const ssh = await connectSSH(config, isDesktop);
 
         try {
             // ── Step 5: Swap memory ──────────────────────────────────────────
@@ -98,11 +98,16 @@ async function deploy(): Promise<void> {
             log.header('DEPLOYMENT COMPLETE 🚀');
 
         } finally {
-            // SSH is ALWAYS cleaned up, whether success or failure
-            ssh.dispose();
+            // SSH is ALWAYS cleaned up for CLI
+            if (!isDesktop) {
+                try { ssh.dispose(); } catch {}
+            }
         }
 
     } catch (err: unknown) {
+        if (isDesktop) {
+            throw err;
+        }
         // Single unified error handler — formats every error cleanly, no stack traces
         handleFatalError(err);
     }

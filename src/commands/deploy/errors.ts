@@ -35,7 +35,8 @@ export const EXIT_CODES = {
 export async function execWithTimeout(
     ssh: NodeSSH,
     command: string,
-    timeoutMs: number = 300_000
+    timeoutMs: number = 300_000,
+    streamLogs: boolean = false
 ): Promise<{ stdout: string; stderr: string; code: number | null }> {
     return new Promise((resolve, reject) => {
         const timer = setTimeout(() => {
@@ -46,7 +47,13 @@ export async function execWithTimeout(
             ));
         }, timeoutMs);
 
-        ssh.execCommand(command)
+        const options: any = {};
+        if (streamLogs) {
+            options.onStdout = (chunk: Buffer) => log.stream(chunk.toString('utf8'));
+            options.onStderr = (chunk: Buffer) => log.stream(chunk.toString('utf8'));
+        }
+
+        ssh.execCommand(command, options)
             .then((result) => {
                 clearTimeout(timer);
                 resolve(result);
@@ -62,9 +69,10 @@ export async function execWithTimeout(
 export async function exec(
     ssh: NodeSSH,
     command: string,
-    timeoutMs?: number
+    timeoutMs?: number,
+    streamLogs: boolean = false
 ): Promise<{ stdout: string; stderr: string; code: number | null }> {
-    const result = await execWithTimeout(ssh, command, timeoutMs);
+    const result = await execWithTimeout(ssh, command, timeoutMs, streamLogs);
     if (result.code !== 0) {
         const errorOutput = result.stderr || result.stdout;
         log.error(`Command failed: ${command.trim().slice(0, 120)}`);

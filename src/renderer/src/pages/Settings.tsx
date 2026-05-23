@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { SuccessIcon, WarningIcon, SyncIcon, TrashIcon } from '../components/Icons';
+import { SuccessIcon, WarningIcon, SyncIcon, TrashIcon, DownloadIcon } from '../components/Icons';
+import { DependencyInstaller } from '../components/DependencyInstaller';
 
 interface SettingsProps {
     onReRunOnboarding: () => void;
     onResetConfig: () => void;
+    showConfirm: (opts: { title: string; message: string; confirmLabel?: string; danger?: boolean; onConfirm: () => void }) => void;
 }
 
-export const Settings: React.FC<SettingsProps> = ({ onReRunOnboarding, onResetConfig }) => {
+export const Settings: React.FC<SettingsProps> = ({ onReRunOnboarding, onResetConfig, showConfirm }) => {
     // Config states
     const [serverIp, setServerIp] = useState('');
     const [sshUser, setSshUser] = useState('');
@@ -15,6 +17,7 @@ export const Settings: React.FC<SettingsProps> = ({ onReRunOnboarding, onResetCo
 
     const [loading, setLoading] = useState(false);
     const [saveStatus, setSaveStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+    const [showDependencyInstaller, setShowDependencyInstaller] = useState(false);
 
     // Fetch existing settings on load
     useEffect(() => {
@@ -63,7 +66,10 @@ export const Settings: React.FC<SettingsProps> = ({ onReRunOnboarding, onResetCo
                 sshPort,
                 sshKeyPath
             });
-            setSaveStatus({ type: 'success', message: 'Server configuration saved successfully.' });
+            // Reconnect SSH with the new settings
+            await window.autoflow.disconnectFromServer();
+            await window.autoflow.connectToServer();
+            setSaveStatus({ type: 'success', message: 'Server configuration saved. SSH reconnected.' });
         } catch (err: any) {
             setSaveStatus({ type: 'error', message: err.message || 'Failed to save configuration.' });
         } finally {
@@ -72,21 +78,23 @@ export const Settings: React.FC<SettingsProps> = ({ onReRunOnboarding, onResetCo
     };
 
     const handleReRunOnboardingClick = () => {
-        const confirm = window.confirm(
-            'Are you sure you want to re-run onboarding? This will clear the active connection settings and log you out.'
-        );
-        if (confirm) {
-            onReRunOnboarding();
-        }
+        showConfirm({
+            title: 'Re-run Onboarding',
+            message: 'This will clear the active connection settings and log you out. You will need to re-enter your server details.',
+            confirmLabel: 'Continue',
+            danger: false,
+            onConfirm: onReRunOnboarding
+        });
     };
 
     const handleResetAllClick = () => {
-        const confirm = window.confirm(
-            'WARNING: This will perform a complete system factory reset. It will delete all connection details, lock the vault database, and clear the saved projects list. This action cannot be undone.\n\nAre you sure you want to proceed?'
-        );
-        if (confirm) {
-            onResetConfig();
-        }
+        showConfirm({
+            title: 'Factory Reset',
+            message: 'This will permanently delete all connection details, lock the vault database, and clear the saved projects list. This action cannot be undone.',
+            confirmLabel: 'Reset Everything',
+            danger: true,
+            onConfirm: onResetConfig
+        });
     };
 
     return (
@@ -211,6 +219,22 @@ export const Settings: React.FC<SettingsProps> = ({ onReRunOnboarding, onResetCo
                         </button>
                     </div>
 
+                    <div className="card">
+                        <h3 className="h2" style={{ fontSize: '15px', marginBottom: '12px' }}>
+                            Server Requirements
+                        </h3>
+                        <p className="text-secondary" style={{ fontSize: '12.5px', lineHeight: '1.5', marginBottom: '16px' }}>
+                            Analyze your server environment and install missing dependencies like Git, Docker, and Nginx.
+                        </p>
+                        <button
+                            onClick={() => setShowDependencyInstaller(true)}
+                            className="btn btn-secondary"
+                            style={{ width: '100%', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                        >
+                            <DownloadIcon size={14} /> Run Dependency Check
+                        </button>
+                    </div>
+
                     <div className="card" style={{ border: '1px solid rgba(239, 68, 68, 0.3)' }}>
                         <h3 className="h2" style={{ fontSize: '15px', marginBottom: '12px', color: 'var(--error)' }}>
                             Danger Zone
@@ -228,6 +252,10 @@ export const Settings: React.FC<SettingsProps> = ({ onReRunOnboarding, onResetCo
                     </div>
                 </div>
             </div>
+
+            {showDependencyInstaller && (
+                <DependencyInstaller onClose={() => setShowDependencyInstaller(false)} />
+            )}
         </div>
     );
 };

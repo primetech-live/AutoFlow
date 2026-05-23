@@ -3,7 +3,17 @@ import log from '../../utils/logger';
 import { GlobalConfig } from '../../utils/config';
 import { AutoFlowError, EXIT_CODES, registerCleanupHandlers } from './errors';
 
-export async function connectSSH(config: GlobalConfig): Promise<NodeSSH> {
+import { connectionManager } from '../../core/connection';
+
+export async function connectSSH(config: GlobalConfig, isDesktop: boolean = false): Promise<NodeSSH> {
+    if (isDesktop) {
+        log.info(`Using persistent connection to ${config.serverIp}...`);
+        await connectionManager.connect(config);
+        const ssh = connectionManager.getSsh();
+        if (!ssh) throw new Error('Persistent SSH connection could not be retrieved');
+        return ssh;
+    }
+
     const ssh = new NodeSSH();
 
     log.info(`Connecting to ${config.serverIp} via SSH...`);

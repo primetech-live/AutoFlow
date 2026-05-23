@@ -1,4 +1,6 @@
-import { NodeSSH } from 'node-ssh';
+import { EventEmitter } from 'events';
+import { connectionManager } from './connection';
+import { deployerEngine } from './deployer';
 import { GlobalConfig } from './config';
 
 export interface ServerStats {
@@ -19,29 +21,25 @@ export interface ServerStats {
 
 export class MonitorEngine {
     /**
-     * Connects to SSH and fetches stats dynamically
+     * Fetches stats dynamically using the persistent connection
      */
-    public async fetchStats(config: GlobalConfig): Promise<ServerStats> {
-        const ssh = new NodeSSH();
+    public async fetchStats(): Promise<ServerStats> {
+        if (connectionManager.getState() !== 'Connected') {
+            throw new Error('Not connected to server');
+        }
+
         const startTime = Date.now();
 
         try {
-            await ssh.connect({
-                host: config.serverIp,
-                username: config.sshUser,
-                port: Number(config.sshPort),
-                privateKeyPath: config.sshKeyPath.replace(/^"|"$/g, ''),
-            });
-
             const latency = `${Date.now() - startTime} ms`;
 
             // Run status collection commands in parallel
             const [cpuRaw, ramRaw, diskRaw, uptimeRaw, dockerRaw] = await Promise.all([
-                this.safeRun(ssh, "top -bn1 | grep 'Cpu(s)' | sed 's/.*, *\\([0-9.]*\\)%* id.*/\\1/' | awk '{print 100 - $1}'"),
-                this.safeRun(ssh, "free -m"),
-                this.safeRun(ssh, "df -h / | tail -n 1 | awk '{print $3 \" / \" $2 \",\" $5}'"),
-                this.safeRun(ssh, "uptime -p"),
-                this.safeRun(ssh, "docker ps --format '{{.Names}},{{.Status}}'"),
+                connectionManager.safeRun("top -bn1 | grep 'Cpu(s)' | sed 's/.*, *\\([0-9.]*\\)%* id.*/\\1/' | awk '{print 100 - $1}'"),
+                connectionManager.safeRun("free -m"),
+                connectionManager.safeRun("df -h / | tail -n 1 | awk '{print $3 \" / \" $2 \",\" $5}'"),
+                connectionManager.safeRun("uptime -p"),
+                connectionManager.safeRun("docker ps --format '{{.Names}},{{.Status}}'"),
             ]);
 
             // 1. Process CPU
@@ -54,8 +52,6 @@ export class MonitorEngine {
             let ram = 'N/A';
             let ramPercent = 0;
             if (ramRaw) {
-                // free -m columns: total used free shared buff/cache available
-                // Line 2: Mem: total used ...
                 const lines = ramRaw.split('\n');
                 const memLine = lines.find(l => l.includes('Mem:'));
                 if (memLine) {
@@ -85,31 +81,40 @@ export class MonitorEngine {
             const containers: ServerStats['containers'] = [];
             if (dockerRaw) {
                 const rows = dockerRaw.trim().split('\n').filter(Boolean);
-                for (const row of rows) {
-                    const [name, status] = row.split(',');
-                    // Fetch CPU/Mem for this specific container
-                    let containerCpu = '0%';
-                    let containerMem = '0MB';
-                    
-                    if (name) {
-                        const statsLine = await this.safeRun(ssh, `docker stats ${name} --no-stream --format "{{.CPUPerc}},{{.MemUsage}}"`);
-                        if (statsLine) {
-                            const [c, m] = statsLine.trim().split(',');
-                            containerCpu = c || '0%';
-                            containerMem = m ? m.split(' / ')[0] : '0MB';
+                const names = rows.map(r => r.split(',')[0]).filter(Boolean);
+
+                // Fetch all container stats in a single docker stats call (fast)
+                let statsMap: Record<string, { cpu: string; mem: string }> = {};
+                if (names.length > 0) {
+                    const allStatsRaw = await connectionManager.safeRun(
+                        `docker stats ${names.join(' ')} --no-stream --format "{{.Name}},{{.CPUPerc}},{{.MemUsage}}"`
+                    );
+                    if (allStatsRaw) {
+                        for (const line of allStatsRaw.trim().split('\n').filter(Boolean)) {
+                            const parts = line.split(',');
+                            if (parts.length >= 3) {
+                                statsMap[parts[0]] = {
+                                    cpu: parts[1] || '0%',
+                                    mem: parts[2] ? parts[2].split(' / ')[0] : '0MB'
+                                };
+                            }
                         }
                     }
+                }
 
+                for (const row of rows) {
+                    const [name, status] = row.split(',');
+                    const s = statsMap[name] || { cpu: '0%', mem: '0MB' };
                     containers.push({
                         name: name || 'unknown',
                         status: status || 'stopped',
-                        cpu: containerCpu,
-                        mem: containerMem,
+                        cpu: s.cpu,
+                        mem: s.mem,
                     });
                 }
             } else {
                 // Fallback 1: PM2 process monitoring
-                const pm2Raw = await this.safeRun(ssh, "pm2 jlist");
+                const pm2Raw = await connectionManager.safeRun("pm2 jlist");
                 if (pm2Raw) {
                     try {
                         const apps = JSON.parse(pm2Raw.trim());
@@ -135,7 +140,7 @@ export class MonitorEngine {
 
                 // Fallback 2: Systemd active services list
                 if (containers.length === 0) {
-                    const systemdRaw = await this.safeRun(ssh, "systemctl list-units --type=service --state=running --no-legend --no-pager | head -n 10");
+                    const systemdRaw = await connectionManager.safeRun("systemctl list-units --type=service --state=running --no-legend --no-pager | head -n 10");
                     if (systemdRaw) {
                         const rows = systemdRaw.trim().split('\n').filter(Boolean);
                         for (const row of rows) {
@@ -169,21 +174,15 @@ export class MonitorEngine {
         } catch (err: any) {
             console.error('[MonitorEngine] Failed to gather stats:', err.message);
             throw err;
-        } finally {
-            ssh.dispose();
         }
     }
 
-    public async fetchRemoteLogs(config: GlobalConfig, name: string): Promise<string> {
-        const ssh = new NodeSSH();
-        try {
-            await ssh.connect({
-                host: config.serverIp,
-                username: config.sshUser,
-                port: Number(config.sshPort),
-                privateKeyPath: config.sshKeyPath.replace(/^"|"$/g, ''),
-            });
+    public async fetchRemoteLogs(name: string): Promise<string> {
+        if (connectionManager.getState() !== 'Connected') {
+            throw new Error('Not connected to server');
+        }
 
+        try {
             let cmd = `docker logs --tail 150 ${name}`;
             if (name.startsWith('[pm2] ')) {
                 const pm2Name = name.replace('[pm2] ', '');
@@ -193,25 +192,49 @@ export class MonitorEngine {
                 cmd = `journalctl -u "${systemdName}" -n 150 --no-pager`;
             }
 
-            const result = await ssh.execCommand(cmd);
+            const result = await connectionManager.execCommand(cmd);
             return result.stdout || result.stderr || 'No logs found.';
         } catch (err: any) {
             return `Failed to fetch remote logs: ${err.message}`;
-        } finally {
-            ssh.dispose();
         }
     }
 
-    private async safeRun(ssh: NodeSSH, cmd: string): Promise<string | null> {
-        try {
-            const result = await ssh.execCommand(cmd);
-            if (result.code === 0) return result.stdout;
-            return null;
-        } catch {
-            return null;
-        }
+    private cleanName(name: string): string {
+        if (name.startsWith('[pm2] ')) return name.replace('[pm2] ', '');
+        if (name.startsWith('[systemd] ')) return name.replace('[systemd] ', '');
+        return name;
+    }
+
+    // --- Container Controls ---
+    public async stopContainer(name: string): Promise<boolean> {
+        let success = false;
+        if (name.startsWith('[pm2] ')) success = (await connectionManager.safeRun(`pm2 stop "${name.replace('[pm2] ', '')}"`)) !== null;
+        else if (name.startsWith('[systemd] ')) success = (await connectionManager.safeRun(`sudo systemctl stop "${name.replace('[systemd] ', '')}"`)) !== null;
+        else success = (await connectionManager.safeRun(`docker stop ${name}`)) !== null;
+        
+        if (success) deployerEngine.logContainerAction(this.cleanName(name), 'Stopped');
+        return success;
+    }
+
+    public async restartContainer(name: string): Promise<boolean> {
+        let success = false;
+        if (name.startsWith('[pm2] ')) success = (await connectionManager.safeRun(`pm2 restart "${name.replace('[pm2] ', '')}"`)) !== null;
+        else if (name.startsWith('[systemd] ')) success = (await connectionManager.safeRun(`sudo systemctl restart "${name.replace('[systemd] ', '')}"`)) !== null;
+        else success = (await connectionManager.safeRun(`docker restart ${name}`)) !== null;
+
+        if (success) deployerEngine.logContainerAction(this.cleanName(name), 'Restarted');
+        return success;
+    }
+
+    public async deleteContainer(name: string): Promise<boolean> {
+        let success = false;
+        if (name.startsWith('[pm2] ')) success = (await connectionManager.safeRun(`pm2 delete "${name.replace('[pm2] ', '')}"`)) !== null;
+        else if (name.startsWith('[systemd] ')) success = false; // Not safe to delete systemd unit blindly
+        else success = (await connectionManager.safeRun(`docker rm -f ${name}`)) !== null;
+
+        if (success) deployerEngine.logContainerAction(this.cleanName(name), 'Deleted');
+        return success;
     }
 }
 
 export const monitorEngine = new MonitorEngine();
-

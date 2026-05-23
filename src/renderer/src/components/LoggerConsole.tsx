@@ -3,7 +3,7 @@ import { CopyIcon, DownloadIcon, TrashIcon } from './Icons';
 
 export interface LogLine {
     timestamp: number;
-    type: 'info' | 'success' | 'warning' | 'error' | 'header';
+    type: 'info' | 'success' | 'warning' | 'error' | 'header' | 'stream';
     message: string;
     step: string;
 }
@@ -17,6 +17,7 @@ interface LoggerConsoleProps {
 export const LoggerConsole: React.FC<LoggerConsoleProps> = ({ logs, onClear, projectName }) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [stepFilter, setStepFilter] = useState('All');
+    const [copied, setCopied] = useState(false);
     const terminalEndRef = useRef<HTMLDivElement>(null);
 
     // Extract unique steps from logs
@@ -46,7 +47,8 @@ export const LoggerConsole: React.FC<LoggerConsoleProps> = ({ logs, onClear, pro
     const handleCopy = () => {
         const text = filteredLogs.map(l => `[${new Date(l.timestamp).toLocaleTimeString()}] [${l.step}] ${l.message}`).join('\n');
         navigator.clipboard.writeText(text);
-        alert('Logs copied to clipboard!');
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
     };
 
     const handleExport = () => {
@@ -131,7 +133,7 @@ export const LoggerConsole: React.FC<LoggerConsoleProps> = ({ logs, onClear, pro
                     </select>
 
                     <button className="btn btn-secondary" onClick={handleCopy} style={{ padding: '4px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <CopyIcon size={12} /> Copy
+                        <CopyIcon size={12} /> {copied ? 'Copied!' : 'Copy'}
                     </button>
                     
                     <button className="btn btn-secondary" onClick={handleExport} style={{ padding: '4px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>

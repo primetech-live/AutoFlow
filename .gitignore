@@ -20,3 +20,7 @@ yarn-error.log*
 
 # Autoflow specific
 autoflow.config.json
+AGENTS.md
+graphify-out/
+.opencode/
+opencode.json

@@ -11,9 +11,9 @@
     --text-secondary: #9B9BA6;
     --text-muted: #64646E;
     
-    --accent: #10B981; /* Premium emerald-like green */
-    --accent-hover: #059669;
-    --accent-glow: rgba(16, 185, 129, 0.15);
+    --accent: #06B6D4; /* Vibrant Cyan */
+    --accent-hover: #0891B2;
+    --accent-glow: rgba(6, 182, 212, 0.15);
     
     --error: #EF4444;
     --error-glow: rgba(239, 68, 68, 0.15);
@@ -65,7 +65,7 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0 16px;
+    padding: 0 0 0 16px;
     -webkit-app-region: drag;
 }
 
@@ -168,6 +168,10 @@ body {
     cursor: pointer;
     transition: all var(--transition-speed);
     text-decoration: none;
+    background: transparent;
+    border: 1px solid transparent;
+    outline: none;
+    text-align: left;
 }
 
 .nav-item:hover {
@@ -178,7 +182,7 @@ body {
 .nav-item.active {
     background: var(--accent-glow);
     color: var(--accent);
-    border: 1px solid rgba(16, 185, 129, 0.2);
+    border: 1px solid rgba(6, 182, 212, 0.2);
 }
 
 .nav-section-title {

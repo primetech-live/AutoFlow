@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Titlebar } from './components/Titlebar';
+import { DeployProgressModal } from './components/DeployProgressModal';
+import { ConfirmModal } from './components/ConfirmModal';
 import { Onboarding } from './pages/Onboarding';
 import { LockScreen } from './pages/LockScreen';
 import { Dashboard, ScannedProject } from './pages/Dashboard';
@@ -7,11 +9,18 @@ import { ProjectDetails } from './pages/ProjectDetails';
 import { LiveStatus } from './pages/LiveStatus';
 import { Settings } from './pages/Settings';
 import { LogLine } from './components/LoggerConsole';
-import { DashboardIcon, LiveStatusIcon, SettingsIcon, FolderIcon, LockIcon, WarningIcon, ServerIcon, SuccessIcon } from './components/Icons';
+import { DashboardIcon, LiveStatusIcon, SettingsIcon, WarningIcon } from './components/Icons';
+import { InitProjectModal } from './components/InitProjectModal';
+
+declare global {
+    interface Window {
+        autoflow: any;
+    }
+}
 
 interface ActiveDeploy {
     projectName: string;
-    status: 'running' | 'success' | 'failed' | 'idle';
+    status: 'running' | 'success' | 'failed';
     step: string;
     logs: LogLine[];
 }
@@ -23,13 +32,18 @@ const App: React.FC = () => {
     
     // Page state
     const [activePage, setActivePage] = useState<'dashboard' | 'livestatus' | 'settings' | 'project-details'>('dashboard');
+    const [connectionState, setConnectionState] = useState<string>('Disconnected');
     const [selectedProject, setSelectedProject] = useState<ScannedProject | null>(null);
     const [detailTab, setDetailTab] = useState<'overview' | 'env' | 'history' | 'logs' | 'monitor'>('overview');
     
-    // Data list
     const [projects, setProjects] = useState<ScannedProject[]>([]);
     const [vpsContainers, setVpsContainers] = useState<any[]>([]);
     const [vpsLoading, setVpsLoading] = useState<boolean>(false);
+    
+    // Global Server Stats
+    const [serverStats, setServerStats] = useState<any>(null);
+    const [statsLoading, setStatsLoading] = useState<boolean>(true);
+    const [statsError, setStatsError] = useState<string>('');
 
     const cleanContainerName = (name: string): string => {
         if (name.startsWith('[pm2] ')) return name.replace('[pm2] ', '');
@@ -46,6 +60,20 @@ const App: React.FC = () => {
     // Application Loading
     const [appLoading, setAppLoading] = useState(true);
 
+    // Project Initialization Modal State
+    const [showInitModal, setShowInitModal] = useState<boolean>(false);
+    const [initProjectPath, setInitProjectPath] = useState<string>('');
+
+    // Custom confirm modal state
+    const [confirmModal, setConfirmModal] = useState<{
+        title: string;
+        message: string;
+        confirmLabel?: string;
+        danger?: boolean;
+        onConfirm: () => void;
+    } | null>(null);
+
+    const showConfirm = (opts: typeof confirmModal) => setConfirmModal(opts);
     const checkState = async () => {
         try {
             const hasConfig = await window.autoflow.globalConfigExists();
@@ -73,42 +101,47 @@ const App: React.FC = () => {
     const loadProjects = async () => {
         try {
             const list = await window.autoflow.getSavedProjects();
-            setProjects(list.map(p => ({ ...p, status: p.status || 'Idle' })));
+            setProjects(list.map((p: any) => ({ ...p, status: p.status || 'Idle' })));
+        } catch (err) {
+            console.error('Failed to load projects:', err);
+        }
+    };
 
-            // Fetch VPS containers asynchronously to avoid blocking app load
-            setVpsLoading(true);
-            window.autoflow.fetchServerStats().then((stats) => {
-                if (stats && stats.containers) {
-                    setVpsContainers(stats.containers);
+    const fetchGlobalStats = async (isBackground = false) => {
+        if (!isBackground) setStatsLoading(true);
+        if (!isBackground) setStatsError('');
+        try {
+            const stats = await window.autoflow.fetchServerStats();
+            if (stats && stats.containers) {
+                setServerStats(stats);
+                setVpsContainers(stats.containers);
+                
+                window.autoflow.getSavedProjects().then((list: any[]) => {
+                    setProjects(list.map((p: any) => {
+                        const match = stats.containers.find((c: any) => cleanContainerName(c.name) === p.projectName);
+                        return {
+                            ...p,
+                            status: match ? 'Live' : 'Idle',
+                            containerRawName: match ? match.name : p.projectName
+                        };
+                    }));
                     
-                    // Match and update statuses
-                    setProjects(prev => {
-                        return prev.map(p => {
-                            const match = stats.containers.find(c => cleanContainerName(c.name) === p.projectName);
-                            return {
-                                ...p,
-                                status: match ? 'Live' : 'Idle',
-                                containerRawName: match ? match.name : p.projectName
-                            };
-                        });
-                    });
-
-                    // Search globally on local PC in background for unmatched projects
                     const unmatchedLiveNames = stats.containers
-                        .map(c => cleanContainerName(c.name))
-                        .filter(name => !list.some(p => p.projectName === name));
+                        .map((c: any) => cleanContainerName(c.name))
+                        .filter((name: string) => !list.some((p: any) => p.projectName === name));
 
                     if (unmatchedLiveNames.length > 0) {
                         window.autoflow.scanGlobal();
                     }
-                }
-            }).catch((err) => {
-                console.error('Failed to fetch stats:', err);
-            }).finally(() => {
-                setVpsLoading(false);
-            });
-        } catch (err) {
-            console.error('Failed to load projects:', err);
+                });
+            }
+        } catch (err: any) {
+            if (!isBackground) {
+                setStatsError(err.message || 'Failed to gather remote server statistics. Ensure server config is valid and online.');
+            }
+        } finally {
+            if (!isBackground) setStatsLoading(false);
+            setVpsLoading(false);
         }
     };
 
@@ -136,25 +169,32 @@ const App: React.FC = () => {
         checkState();
 
         // Listen for vault lock event changes (timeout/manual trigger)
-        window.autoflow.onVaultLockedStateChange((locked) => {
+        window.autoflow.onVaultLockedStateChange((locked: boolean) => {
             setIsUnlocked(!locked);
             if (locked) {
                 setSelectedProject(null);
             }
         });
 
+        // Listen for connection state changes
+        window.autoflow.getConnectionState().then((state: string) => {
+            setConnectionState(state);
+            if (state === 'Connected') fetchGlobalStats(false);
+        });
+        window.autoflow.onConnectionStateChanged((state: string) => {
+            setConnectionState(state);
+            if (state === 'Connected') fetchGlobalStats(false);
+        });
+
         // Listen to global background scanner
-        window.autoflow.onScanGlobalProjectFound(async (project) => {
+        window.autoflow.onScanGlobalProjectFound(async (project: any) => {
             setVpsContainers(currentContainers => {
-                const liveNames = currentContainers.map(c => cleanContainerName(c.name));
+                const liveNames = currentContainers.map((c: any) => cleanContainerName(c.name));
                 const isMatchedWithVPS = liveNames.includes(project.projectName);
-                
                 if (isMatchedWithVPS) {
-                    window.autoflow.getSavedProjects().then(async (saved) => {
-                        if (!saved.some(p => p.projectPath === project.projectPath)) {
-                            // Automatically add to saved projects
+                    window.autoflow.getSavedProjects().then(async (saved: any[]) => {
+                        if (!saved.some((p: any) => p.projectPath === project.projectPath)) {
                             await window.autoflow.addProject(project.projectPath);
-                            // Reload projects
                             loadProjects();
                         }
                     });
@@ -163,57 +203,12 @@ const App: React.FC = () => {
             });
         });
 
-        // Set up background deployment listeners
-        window.autoflow.onDeployStarted((data) => {
-            setActiveDeploy({
-                projectName: data.projectName,
-                status: 'running',
-                step: 'Initializing connection',
-                logs: [{ timestamp: Date.now(), type: 'info', step: 'init', message: `Deployment started for ${data.projectName}...` }]
-            });
-        });
+        // Background polling — always attempt; IPC handler returns gracefully if not connected
+        const interval = setInterval(() => {
+            fetchGlobalStats(true);
+        }, 5000);
 
-        window.autoflow.onDeployLog((data) => {
-            setActiveDeploy(prev => {
-                if (!prev || prev.projectName !== data.projectName) return prev;
-                return {
-                    ...prev,
-                    step: data.step,
-                    logs: [...prev.logs, {
-                        timestamp: data.timestamp,
-                        type: data.type as any,
-                        step: data.step,
-                        message: data.message
-                    }]
-                };
-            });
-        });
-
-        window.autoflow.onDeploySuccess((data) => {
-            setActiveDeploy(prev => {
-                if (!prev || prev.projectName !== data.projectName) return prev;
-                return {
-                    ...prev,
-                    status: 'success',
-                    step: 'Completed',
-                    logs: [...prev.logs, { timestamp: Date.now(), type: 'info', step: 'finished', message: 'Deployment completed successfully!' }]
-                };
-            });
-            loadProjects();
-        });
-
-        window.autoflow.onDeployFailed((data) => {
-            setActiveDeploy(prev => {
-                if (!prev || prev.projectName !== data.projectName) return prev;
-                return {
-                    ...prev,
-                    status: 'failed',
-                    step: 'Failed',
-                    logs: [...prev.logs, { timestamp: Date.now(), type: 'error', step: 'failed', message: `Deployment failed: ${data.error}` }]
-                };
-            });
-            loadProjects();
-        });
+        return () => clearInterval(interval);
     }, []);
 
     const handleUnlockSuccess = async () => {
@@ -245,6 +240,27 @@ const App: React.FC = () => {
 
     const handleImportProject = async (projectPath: string) => {
         await window.autoflow.addProject(projectPath);
+        
+        // Auto-initialize if it has no config
+        const hasConfig = await window.autoflow.projectConfigExists(projectPath);
+        if (!hasConfig) {
+            setInitProjectPath(projectPath);
+            setShowInitModal(true);
+        } else {
+            await loadProjects();
+        }
+    };
+
+    const handleInitConfirm = async (options: { projectName: string; gitRepo: string; domain: string; strictCI: boolean; useVolumes: boolean }) => {
+        setShowInitModal(false);
+        if (initProjectPath) {
+            await window.autoflow.initProject(initProjectPath, options);
+            await loadProjects();
+        }
+    };
+
+    const handleInitCancel = async () => {
+        setShowInitModal(false);
         await loadProjects();
     };
 
@@ -257,21 +273,94 @@ const App: React.FC = () => {
         }
     };
 
-    const handleTriggerDeploy = async (projectPath: string) => {
+    const handleTriggerDeploy = async (projectPath: string, projectName: string) => {
+        // Open the modal immediately
+        setActiveDeploy({
+            projectName,
+            status: 'running',
+            step: 'Starting',
+            logs: [{ timestamp: Date.now(), type: 'stream', step: 'Prepare', message: `PS ${projectPath}> autoflow deploy\n\n` }]
+        });
+
+        // Listen for streamed log lines from the main process
+        const unsubLog = window.autoflow.onDeployLog((data: any) => {
+            setActiveDeploy(prev => prev ? {
+                ...prev,
+                logs: [...prev.logs, {
+                    timestamp: Date.now(),
+                    type: data.type as any,
+                    step: 'Running',
+                    message: data.message
+                }]
+            } : null);
+        });
+
+        const unsubSuccess = window.autoflow.onDeploySuccess((_data: any) => {
+            setActiveDeploy(prev => prev ? {
+                ...prev,
+                status: 'success',
+                step: 'Completed',
+                logs: [...prev.logs, {
+                    timestamp: Date.now(),
+                    type: 'success',
+                    step: 'Finished',
+                    message: '\nDeployment completed successfully! 🚀\n'
+                }]
+            } : null);
+            loadProjects();
+            fetchGlobalStats(false); // Immediately refresh live status after deploy
+            unsubLog?.();
+            unsubSuccess?.();
+            unsubFailed?.();
+        });
+
+        const unsubFailed = window.autoflow.onDeployFailed((data: any) => {
+            setActiveDeploy(prev => prev ? {
+                ...prev,
+                status: 'failed',
+                step: 'Failed',
+                logs: [...prev.logs, {
+                    timestamp: Date.now(),
+                    type: 'error',
+                    step: 'Failed',
+                    message: `\nDeployment failed: ${data.error}\n`
+                }]
+            } : null);
+            unsubLog?.();
+            unsubSuccess?.();
+            unsubFailed?.();
+        });
+
+        // Kick off the deployment in the main process
         try {
             await window.autoflow.deploy(projectPath);
         } catch (err: any) {
-            alert(`Failed to trigger deploy: ${err.message}`);
+            setActiveDeploy(prev => prev ? {
+                ...prev,
+                status: 'failed',
+                step: 'Failed',
+                logs: [...prev.logs, {
+                    timestamp: Date.now(),
+                    type: 'error',
+                    step: 'Error',
+                    message: `Failed to start deployment: ${err.message}\n`
+                }]
+            } : null);
+            unsubLog?.();
+            unsubSuccess?.();
+            unsubFailed?.();
         }
     };
 
     const handleReRunOnboarding = async () => {
+        setConfirmModal(null);
         await window.autoflow.clearGlobalConfig();
         setIsConfigured(false);
         setActivePage('dashboard');
     };
 
     const handleResetAll = async () => {
+        setConfirmModal(null);
         await window.autoflow.resetAllConfig();
         setIsConfigured(false);
         setIsVaultCreated(false);
@@ -280,7 +369,6 @@ const App: React.FC = () => {
         setSelectedProject(null);
         setActivePage('dashboard');
     };
-
     const handleAcknowledgeRecovery = async () => {
         await window.autoflow.clearInterruptedJob();
         setInterruptedJob(null);
@@ -299,8 +387,29 @@ const App: React.FC = () => {
     if (isVaultCreated && !isUnlocked) {
         return (
             <div className="app-container">
-                <Titlebar isUnlocked={false} />
-                <LockScreen onUnlockSuccess={handleUnlockSuccess} />
+                <Titlebar isUnlocked={isUnlocked} />
+                <LockScreen 
+                    onUnlockSuccess={handleUnlockSuccess} 
+                    onResetRequest={() => {
+                        showConfirm({
+                            title: 'Factory Reset',
+                            message: 'Are you sure you want to completely wipe all Autoflow settings, keys, and vaults? This will reset the application to its fresh install state and cannot be undone.',
+                            confirmLabel: 'Reset Everything',
+                            danger: true,
+                            onConfirm: handleResetAll
+                        });
+                    }}
+                />
+                {confirmModal && (
+                    <ConfirmModal
+                        title={confirmModal.title}
+                        message={confirmModal.message}
+                        confirmLabel={confirmModal.confirmLabel}
+                        danger={confirmModal.danger}
+                        onConfirm={confirmModal.onConfirm}
+                        onCancel={() => setConfirmModal(null)}
+                    />
+                )}
             </div>
         );
     }
@@ -318,6 +427,36 @@ const App: React.FC = () => {
     return (
         <div className="app-container">
             <Titlebar isUnlocked={true} onLockClick={handleLockVault} />
+
+            {activeDeploy && (
+                <DeployProgressModal 
+                    activeDeploy={activeDeploy} 
+                    onClose={() => {
+                        if (activeDeploy.status !== 'running') {
+                            setActiveDeploy(null);
+                        }
+                    }} 
+                />
+            )}
+
+            {confirmModal && (
+                <ConfirmModal
+                    title={confirmModal.title}
+                    message={confirmModal.message}
+                    confirmLabel={confirmModal.confirmLabel}
+                    danger={confirmModal.danger}
+                    onConfirm={confirmModal.onConfirm}
+                    onCancel={() => setConfirmModal(null)}
+                />
+            )}
+
+            {showInitModal && initProjectPath && (
+                <InitProjectModal 
+                    projectPath={initProjectPath}
+                    onConfirm={handleInitConfirm}
+                    onCancel={handleInitCancel}
+                />
+            )}
 
             <div className="workspace-layout">
                 {/* Left navigation sidebar */}
@@ -372,9 +511,16 @@ const App: React.FC = () => {
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            if (confirm(`Remove project ${proj.projectName} from Autoflow?`)) {
-                                                handleRemoveProject(proj.projectPath);
-                                            }
+                                            showConfirm({
+                                                title: 'Remove Project',
+                                                message: `Remove "${proj.projectName}" from Autoflow? This only removes it from the list — your local files are not deleted.`,
+                                                confirmLabel: 'Remove',
+                                                danger: true,
+                                                onConfirm: () => {
+                                                    setConfirmModal(null);
+                                                    handleRemoveProject(proj.projectPath);
+                                                }
+                                            });
                                         }}
                                         style={{
                                             background: 'transparent',
@@ -421,6 +567,14 @@ const App: React.FC = () => {
                             })}
                         </div>
                     )}
+
+                    <div style={{ padding: '16px', marginTop: 'auto', borderTop: '1px solid var(--border-color)', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)' }}>
+                        <span style={{
+                            width: '8px', height: '8px', borderRadius: '50%',
+                            background: connectionState === 'Connected' ? 'var(--accent)' : connectionState === 'Connecting' || connectionState === 'Reconnecting' ? 'var(--warning)' : 'var(--error)'
+                        }}></span>
+                        <span style={{ fontWeight: 600 }}>{connectionState}</span>
+                    </div>
                 </div>
 
                 {/* Main page content container */}
@@ -438,13 +592,21 @@ const App: React.FC = () => {
                     )}
 
                     {activePage === 'livestatus' && (
-                        <LiveStatus />
+                        <LiveStatus 
+                            stats={serverStats}
+                            loading={statsLoading}
+                            error={statsError}
+                            onRefresh={() => fetchGlobalStats(false)}
+                            onAction={() => fetchGlobalStats(true)}
+                            showConfirm={showConfirm}
+                        />
                     )}
 
                     {activePage === 'settings' && (
                         <Settings
                             onReRunOnboarding={handleReRunOnboarding}
                             onResetConfig={handleResetAll}
+                            showConfirm={showConfirm}
                         />
                     )}
 
@@ -457,6 +619,7 @@ const App: React.FC = () => {
                             activeDeploy={activeDeploy && activeDeploy.projectName === selectedProject.projectName ? activeDeploy : null}
                             onClearLogs={() => setActiveDeploy(null)}
                             onRefreshProjects={loadProjects}
+                            showConfirm={showConfirm}
                         />
                     )}
                 </div>

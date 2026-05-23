@@ -4,6 +4,7 @@ import os from 'os';
 import { EventEmitter } from 'events';
 import { loadGlobalConfig, loadProjectConfig } from './config';
 import deployProjectCore from '../commands/deploy/index';
+import { initProjectCore } from './initializer';
 import { addLogListener, removeLogListener, LogType } from '../utils/logger';
 
 export interface DeploymentHistoryItem {
@@ -11,7 +12,7 @@ export interface DeploymentHistoryItem {
     sequence: number;
     timestamp: number;
     duration: number; // in seconds
-    status: 'Live' | 'Failed' | 'Rolled Back' | 'Interrupted';
+    status: 'Live' | 'Failed' | 'Rolled Back' | 'Interrupted' | 'Stopped' | 'Deleted' | 'Restarted';
     notes: string;
     commitSha: string;
 }
@@ -92,6 +93,9 @@ export class DeployerEngine extends EventEmitter {
      * Appends a new item to project deployment history
      */
     public saveHistoryItem(projectName: string, item: DeploymentHistoryItem) {
+        if (!fs.existsSync(HISTORY_DIR)) {
+            fs.mkdirSync(HISTORY_DIR, { recursive: true });
+        }
         const historyFile = path.join(HISTORY_DIR, `${projectName}.json`);
         const list = this.getHistory(projectName);
         list.unshift(item); // Add to beginning (newest first)
@@ -99,61 +103,98 @@ export class DeployerEngine extends EventEmitter {
     }
 
     /**
+     * Logs manual container lifecycle actions
+     */
+    public logContainerAction(projectName: string, action: 'Stopped' | 'Deleted' | 'Restarted') {
+        const item: DeploymentHistoryItem = {
+            id: `action-${Date.now()}`,
+            sequence: this.getHistory(projectName).length + 1,
+            timestamp: Date.now(),
+            duration: 0,
+            status: action,
+            notes: `Container manually ${action.toLowerCase()} via UI`,
+            commitSha: 'N/A'
+        };
+        this.saveHistoryItem(projectName, item);
+    }
+
+    /**
      * Launches background deployment for a project path
      */
     public async deploy(projectPath: string): Promise<void> {
-        const projectConfig = loadProjectConfig(projectPath);
-        const projectName = projectConfig.projectName;
-
-        if (this.activeDeployments.has(projectName)) {
-            throw new Error(`Deployment already running for project: ${projectName}`);
-        }
-
+        let projectName = 'Unknown';
         const startTime = Date.now();
         const logs: Array<{ timestamp: number; type: LogType; message: string }> = [];
-        
-        this.activeDeployments.set(projectName, {
-            startTime,
-            step: 'Prepare',
-            logs
-        });
-
-        this.markJobActive(projectPath, projectName);
-        this.emit('deploy:started', { projectName, startTime });
-
-        // Connect the logger listener
-        const logListener = (type: LogType, message: string) => {
-            const timestamp = Date.now();
-            logs.push({ timestamp, type, message });
-            
-            // Map console outputs to deploy pipeline steps
-            let currentStep = 'Prepare';
-            if (message.includes('SSH connected')) currentStep = 'Upload';
-            else if (message.includes('Docker image')) currentStep = 'Build';
-            else if (message.includes('container health')) currentStep = 'Verify';
-            else if (message.includes('COMPLETE')) currentStep = 'Live';
-
-            const active = this.activeDeployments.get(projectName);
-            if (active) {
-                active.step = currentStep;
-            }
-
-            this.emit('deploy:log', { projectName, timestamp, type, message, step: currentStep });
-        };
-
-        addLogListener(logListener);
+        let logListener: ((type: LogType, message: string) => void) | null = null;
 
         try {
-            // Modify process working directory temporarily
+            const projectConfig = loadProjectConfig(projectPath);
+            projectName = projectConfig.projectName || path.basename(projectPath);
+
+            if (this.activeDeployments.has(projectName)) {
+                throw new Error(`Deployment already running for project: ${projectName}`);
+            }
+
+            this.activeDeployments.set(projectName, {
+                startTime,
+                step: 'Prepare',
+                logs
+            });
+
+            this.markJobActive(projectPath, projectName);
+            this.emit('deploy:started', { projectName, startTime });
+
+            const DEBUG_LOG = path.join(process.cwd(), 'debug-deploy.txt');
+            const dlog = (msg: string) => {
+                try { fs.appendFileSync(DEBUG_LOG, `[${new Date().toISOString()}] ${msg}\n`); } catch {}
+            };
+
+            dlog(`Deploying project: ${projectName}`);
+
+            const { default: deployProjectCore } = require('../commands/deploy/index');
+            const { addLogListener, removeLogListener } = require('../utils/logger');
+
+            const active = this.activeDeployments.get(projectName);
+            if (!active) return;
+
+            const logListener = (type: string, message: string) => {
+                const text = message.trim();
+                if (!text) return;
+
+                dlog(`LOG [${type}]: ${text}`);
+                
+                let currentStep = active.step || 'Prepare';
+                if (text.includes('CI CHECKS') || text.includes('Checking GitHub')) currentStep = 'Prepare';
+                else if (text.includes('Pushing to remote') || text.includes('Uploading')) currentStep = 'Upload';
+                else if (text.includes('Building Docker')) currentStep = 'Build';
+                else if (text.includes('Health check')) currentStep = 'Verify';
+                else if (text.includes('SUCCESS') || text.includes('is LIVE')) currentStep = 'Live';
+
+                active.step = currentStep;
+                active.logs.push({ timestamp: Date.now(), type: type as any, message: text });
+                this.emit('deploy:log', { projectName, timestamp: Date.now(), type, message: text, step: currentStep });
+            };
+
+            addLogListener(logListener);
+
             const originalCwd = process.cwd();
-            process.chdir(projectPath);
+            try {
+                // Change directory to the project path so all CLI tools (config, git, etc.) work flawlessly natively
+                process.chdir(projectPath);
+                
+                // Execute directly in main process (100% reliable, zero ASAR spawn bugs)
+                await deployProjectCore(true); // true = isDesktop
+            } catch (err: any) {
+                removeLogListener(logListener);
+                throw err;
+            } finally {
+                // Always restore the original working directory
+                process.chdir(originalCwd);
+                removeLogListener(logListener);
+            }
 
-            // Execute CLI deploy index core logic
-            await deployProjectCore();
-
-            process.chdir(originalCwd);
-
-            // Fetch current git revision
+            dlog(`Process completed successfully.`);
+            
             let commitSha = 'Unknown';
             try {
                 const { execSync } = require('child_process');
@@ -167,7 +208,6 @@ export class DeployerEngine extends EventEmitter {
                 } catch {}
             }
 
-            // Save success record
             const duration = Math.round((Date.now() - startTime) / 1000);
             this.saveHistoryItem(projectName, {
                 id: `dep-${Date.now()}`,
@@ -180,22 +220,29 @@ export class DeployerEngine extends EventEmitter {
             });
 
             this.emit('deploy:success', { projectName });
-        } catch (err: any) {
-            const duration = Math.round((Date.now() - startTime) / 1000);
+
+        } catch (error: any) {
+            console.error('[Deployer] Deployment failed:', error);
+            
+            const active = this.activeDeployments.get(projectName);
+            if (active) {
+                active.logs.push({ timestamp: Date.now(), type: 'error', message: error.message });
+                active.step = 'Failed';
+            }
+            
             this.saveHistoryItem(projectName, {
                 id: `dep-${Date.now()}`,
                 sequence: this.getHistory(projectName).length + 1,
                 timestamp: Date.now(),
-                duration,
+                duration: Math.round((Date.now() - startTime) / 1000),
                 status: 'Failed',
-                notes: err.message || 'Deployment error',
+                notes: error.message,
                 commitSha: 'N/A'
             });
 
-            this.emit('deploy:failed', { projectName, error: err.message });
-            throw err;
+            this.emit('deploy:failed', { projectName, error: error.message });
         } finally {
-            removeLogListener(logListener);
+            if (logListener) removeLogListener(logListener);
             this.activeDeployments.delete(projectName);
             this.clearActiveJob();
         }

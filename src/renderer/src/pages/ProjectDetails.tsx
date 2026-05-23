@@ -20,10 +20,11 @@ interface ProjectDetailsProps {
     project: ScannedProject;
     initialTab?: 'overview' | 'env' | 'history' | 'logs' | 'monitor';
     onBack: () => void;
-    onTriggerDeploy: (path: string) => void;
+    onTriggerDeploy: (path: string, projectName: string) => void;
     activeDeploy: { projectName: string; status: string; step: string; logs: LogLine[] } | null;
     onClearLogs: () => void;
     onRefreshProjects: () => void;
+    showConfirm: (opts: { title: string; message: string; confirmLabel?: string; danger?: boolean; onConfirm: () => void }) => void;
 }
 
 export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
@@ -33,7 +34,8 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
     onTriggerDeploy,
     activeDeploy,
     onClearLogs,
-    onRefreshProjects
+    onRefreshProjects,
+    showConfirm
 }) => {
     const [activeSubTab, setActiveSubTab] = useState<'overview' | 'env' | 'history' | 'logs' | 'monitor'>('overview');
 
@@ -144,6 +146,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [successMsg, setSuccessMsg] = useState('');
+    const [triggeringDeploy, setTriggeringDeploy] = useState(false);
 
     const isDeployingThis = activeDeploy && activeDeploy.projectName === project.projectName && activeDeploy.status === 'running';
 
@@ -172,7 +175,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                 const env = await window.autoflow.loadEnv(project.projectPath);
                 const list = Object.entries(env).map(([key, value]) => ({
                     key,
-                    value,
+                    value: value as string,
                     masked: true
                 }));
                 setEnvVars(list);
@@ -202,16 +205,26 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
         setLoading(true);
 
         try {
-            await window.autoflow.saveProjectConfig(project.projectPath, {
-                projectName,
-                gitRepo,
-                domain: domain || undefined,
-                appType,
-                deploymentType: appType === 'static' ? 'static' : 'docker',
-                mode: domain ? 'domain' : 'port',
-                strictCI
-            });
-            setSuccessMsg('Project configuration saved successfully.');
+            if (!project.hasConfig) {
+                await window.autoflow.initProject(project.projectPath, {
+                    projectName,
+                    gitRepo,
+                    domain: domain || undefined,
+                    strictCI
+                });
+                setSuccessMsg('Project initialized and configuration saved successfully. You can now deploy!');
+            } else {
+                await window.autoflow.saveProjectConfig(project.projectPath, {
+                    projectName,
+                    gitRepo,
+                    domain: domain || undefined,
+                    appType,
+                    deploymentType: appType === 'static' ? 'static' : 'docker',
+                    mode: domain ? 'domain' : 'port',
+                    strictCI
+                });
+                setSuccessMsg('Project configuration saved successfully.');
+            }
             onRefreshProjects();
         } catch (err: any) {
             setError(err.message || 'Failed to save project configuration.');
@@ -261,15 +274,21 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
         }
     };
 
-    const handleRollback = async (commitSha: string) => {
-        if (confirm(`Are you sure you want to trigger a rollback to deployment commit ${commitSha}?`)) {
-            try {
-                await window.autoflow.rollbackToDeploy(project.projectPath, commitSha);
-                alert('Rollback triggered in background. Check logs to track progress.');
-            } catch (err: any) {
-                alert(`Rollback failed: ${err.message}`);
+    const handleRollback = (commitSha: string) => {
+        showConfirm({
+            title: 'Rollback Deployment',
+            message: `Roll back to commit ${commitSha}? This will re-deploy that version to your server.`,
+            confirmLabel: 'Rollback',
+            danger: true,
+            onConfirm: async () => {
+                try {
+                    await window.autoflow.rollbackToDeploy(project.projectPath, commitSha);
+                    setSuccessMsg('Rollback triggered. Check the deploy terminal for progress.');
+                } catch (err: any) {
+                    setError(`Rollback failed: ${err.message}`);
+                }
             }
-        }
+        });
     };
 
     return (
@@ -308,13 +327,32 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                 <div style={{ display: 'flex', gap: '10px' }}>
                     {!project.isExternal && (
                         <button 
-                            onClick={() => onTriggerDeploy(project.projectPath)}
-                            disabled={isDeployingThis}
-                            className="btn btn-primary"
+                            onClick={async () => {
+                                setTriggeringDeploy(true);
+                                try {
+                                    await onTriggerDeploy(project.projectPath, project.projectName);
+                                } finally {
+                                    setTriggeringDeploy(false);
+                                }
+                            }}
+                            disabled={isDeployingThis || triggeringDeploy || !project.hasConfig}
+                            className={`btn ${!project.hasConfig ? 'btn-secondary' : 'btn-primary'}`}
                             style={{ padding: '10px 20px', display: 'flex', alignItems: 'center', gap: '6px' }}
                         >
-                            <DeployIcon size={14} />
-                            {isDeployingThis ? 'Deploying...' : 'Deploy Now'}
+                            {(isDeployingThis || triggeringDeploy) ? (
+                                <div style={{
+                                    width: '14px', height: '14px',
+                                    border: '2px solid rgba(255,255,255,0.3)',
+                                    borderTop: '2px solid white',
+                                    borderRadius: '50%',
+                                    animation: 'spin 1s linear infinite'
+                                }} />
+                            ) : (
+                                <DeployIcon size={14} />
+                            )}
+                            {!project.hasConfig 
+                                ? 'Initialize Project First' 
+                                : (isDeployingThis || triggeringDeploy) ? 'Deploying...' : 'Deploy Now'}
                         </button>
                     )}
                 </div>
@@ -488,7 +526,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                         </div>
 
                         {/* Env Grid Table */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeigh: '350px', overflowY: 'auto' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '350px', overflowY: 'auto' }}>
                             {envVars.length === 0 ? (
                                 <div className="text-muted" style={{ padding: '20px', textAlign: 'center', border: '1px dashed var(--border-color)', borderRadius: '6px', fontSize: '12.5px' }}>
                                     No environment variables defined yet. Add keys below.

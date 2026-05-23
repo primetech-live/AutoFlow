@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { WarningIcon } from '../components/Icons';
+import { QRCodeSVG } from 'qrcode.react';
 
 interface OnboardingProps {
     onComplete: () => void;
@@ -18,6 +19,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [totpSecret, setTotpSecret] = useState('');
+    const [otpUrl, setOtpUrl] = useState('');
     const [otpCode, setOtpCode] = useState('');
     
     const [error, setError] = useState('');
@@ -28,6 +30,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
         if (step === 2 && !totpSecret) {
             window.autoflow.generateTOTPSecret().then(res => {
                 setTotpSecret(res.secret);
+                setOtpUrl(res.otpauthUrl);
             });
         }
     }, [step]);
@@ -265,22 +268,16 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                         }}>
                             <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>Google Authenticator Setup</span>
                             <span style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center' }}>
-                                Open your Google Authenticator app and add a manual entry with the following configuration:
+                                Scan this QR code with your Google Authenticator app:
                             </span>
                             
-                            <div style={{
-                                background: 'var(--bg-panel)',
-                                padding: '8px 16px',
-                                border: '1px dashed var(--border-color)',
-                                borderRadius: '4px',
-                                fontSize: '15px',
-                                fontWeight: 700,
-                                letterSpacing: '0.05em',
-                                color: 'var(--accent)',
-                                fontFamily: 'monospace'
-                            }}>
-                                {totpSecret || 'Generating...'}
-                            </div>
+                            {otpUrl ? (
+                                <div style={{ background: '#fff', padding: '12px', borderRadius: '8px' }}>
+                                    <QRCodeSVG value={otpUrl} size={128} level="M" />
+                                </div>
+                            ) : (
+                                <div style={{ height: '152px', display: 'flex', alignItems: 'center' }}>Generating QR...</div>
+                            )}
                             
                             <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
                                 Account Name: Autoflow vNext | Key Type: Time-based (TOTP)
