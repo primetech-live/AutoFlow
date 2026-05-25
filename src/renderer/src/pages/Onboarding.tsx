@@ -28,7 +28,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
     // Generate TOTP secret when entering step 2
     useEffect(() => {
         if (step === 2 && !totpSecret) {
-            window.autoflow.generateTOTPSecret().then(res => {
+            (window as any).autoflow.generateTOTPSecret().then((res: any) => {
                 setTotpSecret(res.secret);
                 setOtpUrl(res.otpauthUrl);
             });
@@ -37,7 +37,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
 
     const handleBrowseKey = async () => {
         try {
-            const filepath = await window.autoflow.browseFile();
+            const filepath = await (window as any).autoflow.browseFile();
             if (filepath) {
                 setSshKeyPath(filepath);
             }
@@ -75,10 +75,10 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
 
         try {
             // 1. Setup the vault
-            await window.autoflow.setupVault(password, totpSecret);
+            await (window as any).autoflow.setupVault(password, totpSecret);
             
             // 2. Unlock vault session temporarily (this is implicit in setupVault, but we double unlock just in case)
-            const unlocked = await window.autoflow.unlockVault(password, otpCode);
+            const unlocked = await (window as any).autoflow.unlockVault(password, otpCode);
             if (!unlocked) {
                 setError('OTP verification failed. Please enter the correct 6-digit code from Google Authenticator.');
                 setLoading(false);
@@ -86,7 +86,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
             }
 
             // 3. Save the global server config
-            await window.autoflow.saveGlobalConfig({
+            await (window as any).autoflow.saveGlobalConfig({
                 serverIp,
                 sshUser,
                 sshPort,
@@ -167,7 +167,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                                 placeholder="192.168.1.100"
                                 className="input"
                                 value={serverIp}
-                                onChange={(e) => setSshUser && setServerIp(e.target.value)}
+                                onChange={(e) => setServerIp(e.target.value)}
                             />
                         </div>
 
