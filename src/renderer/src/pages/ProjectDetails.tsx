@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { ScannedProject } from './Dashboard';
 import { LoggerConsole, LogLine } from '../components/LoggerConsole';
-import { 
-    DeployIcon, 
-    RollbackIcon, 
-    LogsIcon, 
+import {
+    DeployIcon,
+    RollbackIcon,
+    LogsIcon,
     LiveStatusIcon,
     WarningIcon,
     SuccessIcon,
@@ -50,7 +50,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
         } else {
             setActiveSubTab('overview');
         }
-    }, [initialTab, project]);
+    }, [initialTab, project.projectName, project.isExternal]);
 
     // Remote Diagnostics Stats states
     const [remoteStats, setRemoteStats] = useState<any>(null);
@@ -84,7 +84,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                     if (n.startsWith('[systemd] ')) return n.replace('[systemd] ', '').replace('.service', '');
                     return n;
                 };
-                const container = stats.containers.find((c: any) => 
+                const container = stats.containers.find((c: any) =>
                     c.name === containerName || cleanName(c.name) === project.projectName
                 );
                 if (container) {
@@ -137,7 +137,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
     const [domain, setDomain] = useState('');
     const [appType, setAppType] = useState(project.appType || 'node');
     const [strictCI, setStrictCI] = useState(false);
-    
+
     // Env vars states
     const [envVars, setEnvVars] = useState<Array<{ key: string; value: string; masked: boolean }>>([]);
     const [newKey, setNewKey] = useState('');
@@ -226,12 +226,12 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                     mode: domain ? 'domain' : 'port',
                     strictCI
                 });
-                
+
                 if (gitPat.trim()) {
                     await window.autoflow.invoke('vault:save-git-pat', projectName, gitPat.trim());
                     setGitPat(''); // clear field after save
                 }
-                
+
                 setSuccessMsg('Project configuration saved successfully.');
             }
             onRefreshProjects();
@@ -300,9 +300,51 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
         });
     };
 
+    const handleStopContainer = () => {
+        const name = project.containerRawName || project.projectName;
+        showConfirm({
+            title: 'Stop Container',
+            message: `Stop container "${name}"? The service will go offline.`,
+            confirmLabel: 'Stop',
+            danger: true,
+            onConfirm: async () => {
+                await window.autoflow.stopContainer(name);
+                onRefreshProjects();
+            }
+        });
+    };
+
+    const handleRestartContainer = () => {
+        const name = project.containerRawName || project.projectName;
+        showConfirm({
+            title: 'Restart Container',
+            message: `Restart container "${name}"? There will be brief downtime.`,
+            confirmLabel: 'Restart',
+            onConfirm: async () => {
+                await window.autoflow.restartContainer(name);
+                onRefreshProjects();
+            }
+        });
+    };
+
+    const handleDeleteContainer = () => {
+        const name = project.containerRawName || project.projectName;
+        showConfirm({
+            title: 'Delete Container',
+            message: `Permanently delete container "${name}"? This cannot be undone and will cause downtime.`,
+            confirmLabel: 'Delete',
+            danger: true,
+            onConfirm: async () => {
+                await window.autoflow.deleteContainer(name);
+                onRefreshProjects();
+                onBack(); // Go back to dashboard if deleted
+            }
+        });
+    };
+
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', flex: 1, overflowY: 'auto' }}>
-            
+
             {/* Header section */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -332,10 +374,48 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                         </span>
                     </div>
                 </div>
-                
+
                 <div style={{ display: 'flex', gap: '10px' }}>
+                    {(project.status === 'Live' || project.status === 'Stopped') && (
+                        <>
+                            {project.status === 'Stopped' ? (
+                                <button
+                                    onClick={handleRestartContainer}
+                                    className="btn btn-secondary"
+                                    style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--accent)', borderColor: 'var(--accent)' }}
+                                >
+                                    Start
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={handleStopContainer}
+                                    className="btn btn-secondary"
+                                    style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                >
+                                    Stop
+                                </button>
+                            )}
+
+                            <button
+                                onClick={handleRestartContainer}
+                                className="btn btn-secondary"
+                                style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                            >
+                                Restart
+                            </button>
+
+                            <button
+                                onClick={handleDeleteContainer}
+                                className="btn btn-danger"
+                                style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                            >
+                                Delete
+                            </button>
+                        </>
+                    )}
+
                     {!project.isExternal && (
-                        <button 
+                        <button
                             onClick={async () => {
                                 setTriggeringDeploy(true);
                                 try {
@@ -359,8 +439,8 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                             ) : (
                                 <DeployIcon size={14} />
                             )}
-                            {!project.hasConfig 
-                                ? 'Initialize Project First' 
+                            {!project.hasConfig
+                                ? 'Initialize Project First'
                                 : (isDeployingThis || triggeringDeploy) ? 'Deploying...' : 'Deploy Now'}
                         </button>
                     )}
@@ -372,7 +452,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                     <WarningIcon size={14} /> {error}
                 </div>
             )}
-            
+
             {successMsg && (
                 <div style={{ background: 'var(--accent-glow)', border: '1px solid rgba(16, 185, 129, 0.2)', color: 'var(--accent)', padding: '10px 14px', borderRadius: '6px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <SuccessIcon size={14} /> {successMsg}
@@ -383,23 +463,23 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
             <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', gap: '4px' }}>
                 {!project.isExternal && (
                     <>
-                        <button 
+                        <button
                             onClick={() => { setActiveSubTab('overview'); setError(''); setSuccessMsg(''); }}
                             className={`btn ${activeSubTab === 'overview' ? 'btn-primary' : 'btn-secondary'}`}
                             style={{ borderRadius: '6px 6px 0 0', borderBottom: 'none', padding: '10px 20px', display: 'flex', alignItems: 'center', gap: '6px' }}
                         >
                             <SettingsIcon size={14} /> Overview Config
                         </button>
-                        
-                        <button 
+
+                        <button
                             onClick={() => { setActiveSubTab('env'); setError(''); setSuccessMsg(''); }}
                             className={`btn ${activeSubTab === 'env' ? 'btn-primary' : 'btn-secondary'}`}
                             style={{ borderRadius: '6px 6px 0 0', borderBottom: 'none', padding: '10px 20px', display: 'flex', alignItems: 'center', gap: '6px' }}
                         >
                             <LockIcon size={14} /> Environment Secrets
                         </button>
-                        
-                        <button 
+
+                        <button
                             onClick={() => { setActiveSubTab('history'); setError(''); setSuccessMsg(''); }}
                             className={`btn ${activeSubTab === 'history' ? 'btn-primary' : 'btn-secondary'}`}
                             style={{ borderRadius: '6px 6px 0 0', borderBottom: 'none', padding: '10px 20px', display: 'flex', alignItems: 'center', gap: '6px' }}
@@ -408,8 +488,8 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                         </button>
                     </>
                 )}
-                
-                <button 
+
+                <button
                     onClick={() => { setActiveSubTab('logs'); setError(''); setSuccessMsg(''); }}
                     className={`btn ${activeSubTab === 'logs' ? 'btn-primary' : 'btn-secondary'}`}
                     style={{ borderRadius: '6px 6px 0 0', borderBottom: 'none', padding: '10px 20px', display: 'flex', alignItems: 'center', gap: '6px' }}
@@ -417,7 +497,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                     <LogsIcon size={14} /> Live Logs
                 </button>
 
-                <button 
+                <button
                     onClick={() => { setActiveSubTab('monitor'); setError(''); setSuccessMsg(''); }}
                     className={`btn ${activeSubTab === 'monitor' ? 'btn-primary' : 'btn-secondary'}`}
                     style={{ borderRadius: '6px 6px 0 0', borderBottom: 'none', padding: '10px 20px', display: 'flex', alignItems: 'center', gap: '6px' }}
@@ -428,105 +508,162 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
 
             {/* Sub Tab contents */}
             <div style={{ flex: 1, minHeight: '300px' }}>
-                
+
                 {/* 1. Overview config */}
                 {activeSubTab === 'overview' && !project.isExternal && (
-                    <form onSubmit={handleSaveConfig} style={{
-                        background: 'var(--bg-panel)',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: '8px',
-                        padding: '24px',
-                        maxWidth: '650px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '16px'
-                    }}>
-                        <h3 className="h2" style={{ fontSize: '15px' }}>Project Settings</h3>
+                    <div style={{ display: 'flex', gap: '24px', alignItems: 'flex-start' }}>
+                        <form onSubmit={handleSaveConfig} style={{
+                            background: 'var(--bg-panel)',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: '8px',
+                            padding: '24px',
+                            width: '650px',
+                            flexShrink: 0,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '16px'
+                        }}>
+                            <h3 className="h2" style={{ fontSize: '15px' }}>Project Settings</h3>
 
-                        <div className="form-group">
-                            <label className="form-label">Project Name</label>
-                            <input 
-                                type="text"
-                                required
-                                className="input"
-                                value={projectName}
-                                onChange={(e) => setProjectName(e.target.value)}
-                            />
-                        </div>
-
-                        <div className="form-group">
-                            <label className="form-label">Git Remote URL</label>
-                            <input 
-                                type="text"
-                                required
-                                placeholder="git@github.com:username/repo.git"
-                                className="input"
-                                value={gitRepo}
-                                onChange={(e) => setGitRepo(e.target.value)}
-                            />
-                        </div>
-
-                        {gitRepo && (
                             <div className="form-group">
-                                <label className="form-label">Git Token (PAT - For Private Repos)</label>
-                                <PasswordInput 
-                                    placeholder="Leave empty to keep existing token"
-                                    value={gitPat}
-                                    onChange={(e) => setGitPat(e.target.value)}
+                                <label className="form-label">Project Name</label>
+                                <input
+                                    type="text"
+                                    required
+                                    className="input"
+                                    value={projectName}
+                                    onChange={(e) => setProjectName(e.target.value)}
                                 />
                             </div>
-                        )}
 
-                        <div className="form-group">
-                            <label className="form-label">Domain configuration (Nginx Reverse Proxy)</label>
-                            <input 
-                                type="text"
-                                placeholder="my-app.example.com (leave blank for Host Port access)"
-                                className="input"
-                                value={domain}
-                                onChange={(e) => setDomain(e.target.value)}
-                            />
-                        </div>
-
-                        <div style={{ display: 'flex', gap: '20px' }}>
-                            <div className="form-group" style={{ flex: 1 }}>
-                                <label className="form-label">App Stack Type</label>
-                                <select 
+                            <div className="form-group">
+                                <label className="form-label">Git Remote URL</label>
+                                <input
+                                    type="text"
+                                    required
+                                    placeholder="git@github.com:username/repo.git"
                                     className="input"
-                                    value={appType}
-                                    onChange={(e) => setAppType(e.target.value)}
-                                >
-                                    <option value="node">Node.js App (Next.js, Express)</option>
-                                    <option value="static">Static Frontend (HTML, React Build)</option>
-                                    <option value="python">Python API (Flask, FastAPI)</option>
-                                    <option value="go">Go Executable</option>
-                                    <option value="vue">Vue.js</option>
-                                    <option value="nuxt">Nuxt.js</option>
-                                </select>
+                                    value={gitRepo}
+                                    onChange={(e) => setGitRepo(e.target.value)}
+                                />
                             </div>
-                            
-                            <div className="form-group" style={{ flex: 1, justifyContent: 'center' }}>
-                                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '20px', cursor: 'pointer' }}>
-                                    <input 
-                                        type="checkbox"
-                                        checked={strictCI}
-                                        onChange={(e) => setStrictCI(e.target.checked)}
-                                        style={{ width: '16px', height: '16px', accentColor: 'var(--accent)' }}
-                                    />
-                                    <span>Enable Strict CI checks</span>
-                                </label>
-                            </div>
-                        </div>
 
-                        <button 
-                            type="submit"
-                            disabled={loading}
-                            className="btn btn-primary"
-                            style={{ alignSelf: 'flex-start', marginTop: '10px', padding: '10px 24px' }}
-                        >
-                            {loading ? 'Saving config...' : 'Save Configuration'}
-                        </button>
-                    </form>
+                            {gitRepo && (
+                                <div className="form-group">
+                                    <label className="form-label">Git Token (PAT - For Private Repos)</label>
+                                    <PasswordInput
+                                        placeholder="Leave empty to keep existing token"
+                                        value={gitPat}
+                                        onChange={(e) => setGitPat(e.target.value)}
+                                    />
+                                </div>
+                            )}
+
+                            <div className="form-group">
+                                <label className="form-label">Domain configuration (Nginx Reverse Proxy)</label>
+                                <input
+                                    type="text"
+                                    placeholder="my-app.example.com (leave blank for Host Port access)"
+                                    className="input"
+                                    value={domain}
+                                    onChange={(e) => setDomain(e.target.value)}
+                                />
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '20px' }}>
+                                <div className="form-group" style={{ flex: 1 }}>
+                                    <label className="form-label">App Stack Type</label>
+                                    <select
+                                        className="input"
+                                        value={appType}
+                                        onChange={(e) => setAppType(e.target.value)}
+                                    >
+                                        <option value="node">Node.js App (Next.js, Express)</option>
+                                        <option value="static">Static Frontend (HTML, React Build)</option>
+                                        <option value="python">Python API (Flask, FastAPI)</option>
+                                        <option value="go">Go Executable</option>
+                                        <option value="vue">Vue.js</option>
+                                        <option value="nuxt">Nuxt.js</option>
+                                    </select>
+                                </div>
+
+                                <div className="form-group" style={{ flex: 1, justifyContent: 'center' }}>
+                                    <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '20px', cursor: 'pointer' }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={strictCI}
+                                            onChange={(e) => setStrictCI(e.target.checked)}
+                                            style={{ width: '16px', height: '16px', accentColor: 'var(--accent)' }}
+                                        />
+                                        <span>Enable Strict CI checks</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="btn btn-primary"
+                                style={{ alignSelf: 'flex-start', marginTop: '10px', padding: '10px 24px' }}
+                            >
+                                {loading ? 'Saving config...' : 'Save Configuration'}
+                            </button>
+                        </form>
+
+                        {/* Live Preview Side Panel */}
+                        {domain && (
+                            <div style={{
+                                flex: 1,
+                                background: 'var(--bg-panel)',
+                                border: '1px solid var(--border-color)',
+                                borderRadius: '8px',
+                                overflow: 'hidden',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                minHeight: '400px',
+                                height: '100%',
+                                alignSelf: 'stretch'
+                            }}>
+                                <div style={{
+                                    padding: '12px 16px',
+                                    borderBottom: '1px solid var(--border-color)',
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    background: 'rgba(0,0,0,0.2)'
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: project.status === 'Live' ? 'var(--accent)' : 'var(--text-muted)' }} />
+                                        <span style={{ fontSize: '13px', fontWeight: 600 }}>Live Preview</span>
+                                    </div>
+                                    <a href={`http://${domain}`} target="_blank" rel="noreferrer" style={{ fontSize: '11px', color: 'var(--accent)', textDecoration: 'none' }}>Open in Browser ↗</a>
+                                </div>
+                                <div style={{ flex: 1, background: '#fff', position: 'relative', overflow: 'hidden' }}>
+                                    {project.status === 'Live' ? (
+                                        <iframe
+                                            src={`http://${domain}`}
+                                            title="Live Preview"
+                                            style={{
+                                                width: '250%',
+                                                height: '250%',
+                                                border: 'none',
+                                                position: 'absolute',
+                                                top: 0,
+                                                left: 0,
+                                                transform: 'scale(0.4)',
+                                                transformOrigin: '0 0'
+                                            }}
+                                        />
+                                    ) : (
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#666', flexDirection: 'column', gap: '10px' }}>
+                                            <div style={{ fontSize: '24px' }}>🛑</div>
+                                            <div style={{ fontSize: '13px' }}>Container is offline. Deploy or Start to see preview.</div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 )}
 
                 {/* 2. Environment Secrets */}
@@ -567,7 +704,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                                         <span style={{ fontFamily: 'monospace', fontWeight: 600, color: 'var(--accent)', minWidth: '180px' }}>
                                             {item.key}
                                         </span>
-                                        
+
                                         <input
                                             type={item.masked ? 'password' : 'text'}
                                             className="input"
@@ -576,11 +713,11 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                                                 const val = e.target.value;
                                                 setEnvVars(prev => prev.map(ev => ev.key === item.key ? { ...ev, value: val } : ev));
                                             }}
-                                            style={{ flex: 1, padding: '4px 10px', fontSize: '12.5px', background: 'transparent', border: 'none', color: 'white' }}
+                                            style={{ flex: 1, padding: '4px 10px', fontSize: '12.5px', background: 'transparent', border: 'none', color: 'var(--text-primary)' }}
                                         />
 
-                                        <button 
-                                            type="button" 
+                                        <button
+                                            type="button"
                                             onClick={() => handleToggleMask(item.key)}
                                             className="btn btn-secondary"
                                             style={{ padding: '4px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}
@@ -589,8 +726,8 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                                             {item.masked ? 'Show' : 'Hide'}
                                         </button>
 
-                                        <button 
-                                            type="button" 
+                                        <button
+                                            type="button"
                                             onClick={() => {
                                                 navigator.clipboard.writeText(item.value);
                                                 setSuccessMsg('Secret copied to clipboard');
@@ -601,9 +738,9 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                                         >
                                             <CopyIcon size={10} /> Copy
                                         </button>
-                                        
-                                        <button 
-                                            type="button" 
+
+                                        <button
+                                            type="button"
                                             onClick={() => handleRemoveEnv(item.key)}
                                             className="btn btn-secondary"
                                             style={{ padding: '4px 8px', fontSize: '11px', color: 'var(--error)', borderColor: 'rgba(239,68,68,0.2)' }}
@@ -628,7 +765,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                         }}>
                             <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
                                 <label className="form-label">New Secret Key</label>
-                                <input 
+                                <input
                                     type="text"
                                     placeholder="DATABASE_URL"
                                     className="input"
@@ -637,10 +774,10 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                                     style={{ padding: '6px 12px', fontSize: '13px' }}
                                 />
                             </div>
-                            
+
                             <div className="form-group" style={{ flex: 2, marginBottom: 0 }}>
                                 <label className="form-label">Secret Value</label>
-                                <input 
+                                <input
                                     type="text"
                                     placeholder="postgresql://root:secret@127.0.0.1:5432/db"
                                     className="input"
@@ -650,8 +787,8 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                                 />
                             </div>
 
-                            <button 
-                                type="button" 
+                            <button
+                                type="button"
                                 onClick={handleAddEnv}
                                 className="btn btn-secondary"
                                 style={{ padding: '8px 16px' }}
@@ -660,7 +797,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                             </button>
                         </div>
 
-                        <button 
+                        <button
                             type="button"
                             disabled={loading}
                             onClick={handleSaveEnv}
@@ -746,18 +883,18 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                                                         borderRadius: '3px',
                                                         textTransform: 'uppercase'
                                                     }}>{item.status}</span>
-                                                    
+
                                                     {item.commitSha && item.commitSha !== 'Unknown' && (
                                                         <span style={{ fontFamily: 'monospace', fontSize: '11px', color: 'var(--text-secondary)' }}>
                                                             ({item.commitSha})
                                                         </span>
                                                     )}
                                                 </div>
-                                                
+
                                                 <div className="text-secondary" style={{ fontSize: '11.5px' }}>
                                                     {item.notes || 'No description'}
                                                 </div>
-                                                
+
                                                 <div className="text-muted" style={{ fontSize: '10.5px' }}>
                                                     {new Date(item.timestamp).toLocaleString()} • Duration: {item.duration}s
                                                 </div>
@@ -975,10 +1112,10 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
             {/* Logger Display Console bottom section */}
             {isDeployingThis && activeDeploy && (
                 <div style={{ marginTop: '12px' }}>
-                    <LoggerConsole 
-                        logs={activeDeploy.logs} 
-                        onClear={onClearLogs} 
-                        projectName={project.projectName} 
+                    <LoggerConsole
+                        logs={activeDeploy.logs}
+                        onClear={onClearLogs}
+                        projectName={project.projectName}
                     />
                 </div>
             )}

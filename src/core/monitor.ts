@@ -39,7 +39,7 @@ export class MonitorEngine {
                 connectionManager.safeRun("free -m"),
                 connectionManager.safeRun("df -h / | tail -n 1 | awk '{print $3 \" / \" $2 \",\" $5}'"),
                 connectionManager.safeRun("uptime -p"),
-                connectionManager.safeRun("docker ps --format '{{.Names}},{{.Status}}'"),
+                connectionManager.safeRun("docker ps -a --format '{{.Names}},{{.Status}}'"),
             ]);
 
             // 1. Process CPU
@@ -222,7 +222,8 @@ export class MonitorEngine {
         else if (name.startsWith('[systemd] ')) success = (await connectionManager.safeRun(`sudo systemctl stop "${name.replace('[systemd] ', '')}"`)) !== null;
         else success = (await connectionManager.safeRun(`docker stop ${name}`)) !== null;
         
-        if (success) deployerEngine.logContainerAction(this.cleanName(name), 'Stopped');
+        // Only log Docker container actions to history to avoid dashboard glitches
+        if (success && !name.startsWith('[')) deployerEngine.logContainerAction(this.cleanName(name), 'Stopped');
         return success;
     }
 
@@ -233,7 +234,7 @@ export class MonitorEngine {
         else if (name.startsWith('[systemd] ')) success = (await connectionManager.safeRun(`sudo systemctl restart "${name.replace('[systemd] ', '')}"`)) !== null;
         else success = (await connectionManager.safeRun(`docker restart ${name}`)) !== null;
 
-        if (success) deployerEngine.logContainerAction(this.cleanName(name), 'Restarted');
+        if (success && !name.startsWith('[')) deployerEngine.logContainerAction(this.cleanName(name), 'Restarted');
         return success;
     }
 
@@ -244,7 +245,7 @@ export class MonitorEngine {
         else if (name.startsWith('[systemd] ')) success = false; // Not safe to delete systemd unit blindly
         else success = (await connectionManager.safeRun(`docker rm -f ${name}`)) !== null;
 
-        if (success) deployerEngine.logContainerAction(this.cleanName(name), 'Deleted');
+        if (success && !name.startsWith('[')) deployerEngine.logContainerAction(this.cleanName(name), 'Deleted');
         return success;
     }
 }

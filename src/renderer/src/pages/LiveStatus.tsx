@@ -238,13 +238,23 @@ export const LiveStatus: React.FC<LiveStatusProps> = ({ stats, loading, error, o
                                             </td>
                                             <td style={{ padding: '12px 16px', textAlign: 'right' }}>
                                                 <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-                                                    <button 
-                                                        onClick={() => handleStopContainer(container.name)}
-                                                        className="btn btn-secondary" 
-                                                        style={{ padding: '4px 8px', fontSize: '11px' }}
-                                                    >
-                                                        Stop
-                                                    </button>
+                                                    {!isUp ? (
+                                                        <button 
+                                                            onClick={() => handleRestartContainer(container.name)}
+                                                            className="btn btn-secondary" 
+                                                            style={{ padding: '4px 8px', fontSize: '11px', color: 'var(--accent)', borderColor: 'var(--accent)' }}
+                                                        >
+                                                            Start
+                                                        </button>
+                                                    ) : (
+                                                        <button 
+                                                            onClick={() => handleStopContainer(container.name)}
+                                                            className="btn btn-secondary" 
+                                                            style={{ padding: '4px 8px', fontSize: '11px' }}
+                                                        >
+                                                            Stop
+                                                        </button>
+                                                    )}
                                                     <button 
                                                         onClick={() => handleRestartContainer(container.name)}
                                                         className="btn btn-secondary" 

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { WarningIcon } from './Icons';
 
 interface ConfirmModalProps {
@@ -7,7 +7,7 @@ interface ConfirmModalProps {
     confirmLabel?: string;
     cancelLabel?: string;
     danger?: boolean;
-    onConfirm: () => void;
+    onConfirm: () => void | Promise<void>;
     onCancel: () => void;
 }
 
@@ -20,6 +20,20 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
     onConfirm,
     onCancel
 }) => {
+    const [isExecuting, setIsExecuting] = useState(false);
+
+    const handleConfirm = async () => {
+        setIsExecuting(true);
+        try {
+            await onConfirm();
+            onCancel(); // Auto-close on success
+        } catch (err) {
+            console.error('Confirmation action failed:', err);
+        } finally {
+            setIsExecuting(false);
+        }
+    };
+
     return (
         <div className="modal-overlay" style={{ zIndex: 1100 }}>
             <div className="modal-content" style={{ width: '440px', maxWidth: '95vw' }}>
@@ -39,15 +53,25 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
                     {message}
                 </div>
                 <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                    <button onClick={onCancel} className="btn btn-secondary" style={{ padding: '8px 20px' }}>
+                    <button onClick={onCancel} disabled={isExecuting} className="btn btn-secondary" style={{ padding: '8px 20px' }}>
                         {cancelLabel}
                     </button>
                     <button
-                        onClick={onConfirm}
+                        onClick={handleConfirm}
+                        disabled={isExecuting}
                         className={danger ? 'btn btn-danger' : 'btn btn-primary'}
-                        style={{ padding: '8px 20px' }}
+                        style={{ padding: '8px 20px', display: 'flex', alignItems: 'center', gap: '6px' }}
                     >
-                        {confirmLabel}
+                        {isExecuting && (
+                            <div style={{
+                                width: '14px', height: '14px',
+                                border: '2px solid rgba(255,255,255,0.3)',
+                                borderTop: '2px solid white',
+                                borderRadius: '50%',
+                                animation: 'spin 1s linear infinite'
+                            }} />
+                        )}
+                        {isExecuting ? 'Processing...' : confirmLabel}
                     </button>
                 </div>
             </div>

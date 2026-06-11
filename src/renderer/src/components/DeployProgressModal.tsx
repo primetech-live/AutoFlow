@@ -200,13 +200,9 @@ export const DeployProgressModal: React.FC<DeployProgressModalProps> = ({ active
 
                     {/* Footer Actions */}
                     <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
-                        {isRunning ? (
-                            <button onClick={onClose} className="btn btn-secondary" style={{ padding: '8px 24px', color: 'var(--text-muted)' }}>
-                                Hide Terminal
-                            </button>
-                        ) : (
+                        {!isRunning && (
                             <button onClick={onClose} className="btn btn-primary" style={{ padding: '8px 24px' }}>
-                                {activeDeploy.status === 'success' ? 'Close Terminal' : 'Close Terminal'}
+                                Close
                             </button>
                         )}
                     </div>

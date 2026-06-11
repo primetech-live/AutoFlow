@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog } from 'electron';
+import { app, BrowserWindow, dialog, shell } from 'electron';
 import path from 'path';
 import { registerIpcHandlers } from './ipc';
 import { deployerEngine } from '../core/deployer';
@@ -38,6 +38,12 @@ function createWindow() {
 
     mainWindow.once('ready-to-show', () => {
         mainWindow?.show();
+    });
+
+    // Intercept external links and open them in the default browser
+    mainWindow.webContents.setWindowOpenHandler((details) => {
+        shell.openExternal(details.url);
+        return { action: 'deny' };
     });
 
     // Intercept close event to check for active deployments

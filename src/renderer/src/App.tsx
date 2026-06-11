@@ -119,9 +119,17 @@ const App: React.FC = () => {
                 window.autoflow.getSavedProjects().then((list: any[]) => {
                     setProjects(list.map((p: any) => {
                         const match = stats.containers.find((c: any) => cleanContainerName(c.name) === p.projectName);
+                        let newStatus = 'Idle';
+                        if (match) {
+                            if (match.status.toLowerCase().includes('exited') || match.status.toLowerCase().includes('created')) {
+                                newStatus = 'Stopped';
+                            } else {
+                                newStatus = 'Live';
+                            }
+                        }
                         return {
                             ...p,
-                            status: match ? 'Live' : 'Idle',
+                            status: newStatus,
                             containerRawName: match ? match.name : p.projectName
                         };
                     }));
@@ -149,6 +157,9 @@ const App: React.FC = () => {
     const liveOnlyProjects = useMemo(() => {
         return vpsContainers
             .filter(c => {
+                // Hide system OS and PM2 services from Dashboard project cards to avoid visual glitch
+                if (c.name.startsWith('[systemd] ') || c.name.startsWith('[pm2] ')) return false;
+
                 const cleanName = cleanContainerName(c.name);
                 return !projects.some(p => p.projectName === cleanName);
             })
@@ -369,6 +380,15 @@ const App: React.FC = () => {
         setSelectedProject(null);
         setActivePage('dashboard');
     };
+
+    const handleResumeProject = async (containerName: string) => {
+        try {
+            await window.autoflow.restartContainer(containerName);
+            fetchGlobalStats(true); // Refresh in background so UI updates immediately
+        } catch (e) {
+            console.error('Failed to resume container', e);
+        }
+    };
     const handleAcknowledgeRecovery = async () => {
         await window.autoflow.clearInterruptedJob();
         setInterruptedJob(null);
@@ -587,6 +607,8 @@ const App: React.FC = () => {
                             onImportProject={handleImportProject}
                             onRemoveProject={handleRemoveProject}
                             onTriggerDeploy={handleTriggerDeploy}
+                            onResumeProject={handleResumeProject}
+                            showConfirm={showConfirm}
                             activeDeploy={activeDeploy}
                         />
                     )}
@@ -612,7 +634,7 @@ const App: React.FC = () => {
 
                     {activePage === 'project-details' && selectedProject && (
                         <ProjectDetails
-                            project={selectedProject}
+                            project={projects.find(p => p.projectName === selectedProject.projectName) || selectedProject}
                             initialTab={detailTab}
                             onBack={() => { setActivePage('dashboard'); setSelectedProject(null); }}
                             onTriggerDeploy={handleTriggerDeploy}

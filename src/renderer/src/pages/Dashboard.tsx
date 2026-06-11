@@ -28,7 +28,7 @@ export interface ScannedProject {
     hasConfig: boolean;
     appType: string;
     gitRepo: string;
-    status?: 'Live' | 'Failed' | 'Idle' | 'Deploying';
+    status?: 'Live' | 'Failed' | 'Idle' | 'Deploying' | 'Stopped';
     isExternal?: boolean;
     containerRawName?: string;
 }
@@ -40,6 +40,8 @@ interface DashboardProps {
     onImportProject: (path: string) => void;
     onRemoveProject: (path: string) => void;
     onTriggerDeploy: (path: string, projectName: string) => void;
+    onResumeProject?: (containerName: string) => void;
+    showConfirm: (opts: { title: string; message: string; confirmLabel?: string; danger?: boolean; onConfirm: () => void }) => void;
     activeDeploy: { projectName: string; status: string; step: string } | null;
 }
 
@@ -50,6 +52,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
     onImportProject,
     onRemoveProject,
     onTriggerDeploy,
+    onResumeProject,
+    showConfirm,
     activeDeploy
 }) => {
     const [searchQuery, setSearchQuery] = useState('');
@@ -192,7 +196,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                             className="input"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            style={{ flex: 1, padding: '8px 0', fontSize: '13px', border: 'none', background: 'transparent', outline: 'none', color: 'white' }}
+                            style={{ flex: 1, padding: '8px 0', fontSize: '13px', border: 'none', background: 'transparent', outline: 'none', color: 'var(--text-primary)' }}
                         />
                     </div>
                     
@@ -265,9 +269,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                                 </span>
                                                 
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                    <span className={`project-status-dot ${isDeploying ? 'live' : (p.status === 'Live' ? 'live' : p.status === 'Failed' ? 'failed' : 'idle')}`} />
-                                                    <span style={{ fontSize: '12px', fontWeight: 600, color: isDeploying ? 'var(--warning)' : (p.status === 'Live' ? 'var(--accent)' : 'var(--text-secondary)') }}>
-                                                        {isDeploying ? 'Deploying...' : (p.status === 'Live' ? 'Connected' : p.status === 'Failed' ? 'Failed' : 'Ready To Deploy')}
+                                                    <span className={`project-status-dot ${isDeploying ? 'live' : (p.status === 'Live' ? 'live' : p.status === 'Failed' ? 'failed' : p.status === 'Stopped' ? 'failed' : 'idle')}`} style={{ background: p.status === 'Stopped' ? 'var(--warning)' : undefined }} />
+                                                    <span style={{ fontSize: '12px', fontWeight: 600, color: isDeploying ? 'var(--warning)' : (p.status === 'Live' ? 'var(--accent)' : p.status === 'Stopped' ? 'var(--warning)' : 'var(--text-secondary)') }}>
+                                                        {isDeploying ? 'Deploying...' : (p.status === 'Live' ? 'Connected' : p.status === 'Failed' ? 'Failed' : p.status === 'Stopped' ? 'Stopped' : 'Ready To Deploy')}
                                                     </span>
                                                 </div>
                                             </div>
@@ -299,14 +303,23 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        onTriggerDeploy(p.projectPath, p.projectName);
+                                                        if (p.status === 'Stopped' && onResumeProject) {
+                                                            showConfirm({
+                                                                title: 'Resume Container',
+                                                                message: `Start container "${p.projectName}"?`,
+                                                                confirmLabel: 'Start',
+                                                                onConfirm: () => onResumeProject(p.containerRawName || p.projectName)
+                                                            });
+                                                        } else {
+                                                            onTriggerDeploy(p.projectPath, p.projectName);
+                                                        }
                                                     }}
                                                     disabled={isDeploying || !p.hasConfig}
-                                                    className="btn btn-primary"
+                                                    className={p.status === 'Stopped' ? 'btn btn-secondary' : 'btn btn-primary'}
                                                     style={{ flex: 1, padding: '6px 12px', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
                                                 >
                                                     <DeployIcon size={12} />
-                                                    {isDeploying ? 'Deploying...' : 'Deploy'}
+                                                    {isDeploying ? 'Deploying...' : (p.status === 'Stopped' ? 'Resume' : 'Deploy')}
                                                 </button>
                                             </div>
 
