@@ -1,8 +1,8 @@
 <div align="center">
-  <h1>🚀 AutoFlow CLI</h1>
-  <p><strong>Automated CI/CD CLI tool designed for students, freelancers, and beginners.</strong></p>
+  <img src="build/icon-1.png" alt="AutoFlow Logo" width="120" />
+  <h1>🚀 AutoFlow vNext</h1>
+  <p><strong>The Ultimate Desktop App & Standalone CLI for Zero-Config VPS Deployments</strong></p>
   <p>
-    <a href="https://www.npmjs.com/package/autoflow-cli"><img src="https://img.shields.io/npm/v/autoflow-tech?color=blue&style=for-the-badge&logo=npm" alt="NPM Version" /></a>
     <img src="https://img.shields.io/node/v/autoflow-tech?style=for-the-badge" alt="Node Version" />
     <img src="https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge" alt="License" />
   </p>
@@ -12,120 +12,97 @@
 
 ## 📖 About AutoFlow
 
-**AutoFlow** simplifies the deployment process by bridging your local development environment directly to a remote server. It automates complex DevOps tasks like Git operations, Docker orchestration, Nginx reverse proxy setup, and SSL configuration.  
+**AutoFlow** is a next-generation PaaS-in-a-box that bridges your local development environment directly to your remote Linux servers. It abstracts away the massive headaches of DevOps—Git syncing, Docker orchestration, Nginx reverse proxy routing, and SSL configurations—behind a beautiful **Desktop UI** and a lightning-fast **Standalone CLI**.
 
-Abstract away the quirks of Linux administration, Docker configurations, and Nginx setups behind a simple, unified, and beautiful CLI interface!
-
-## ✨ Key Features
-
-- **🤖 Smart Framework Detection:** Automatically detects Next.js, Vite, React, Vue, Node.js or Static sites and prepares an optimal, production-ready `Dockerfile`.
-- **🔐 Secure Global Configuration:** Securely stores your Server IP and SSH credentials globally so you only configure it *once*. Uses strict `600` file permissions.
-- **⚡ Atomic Deployments:** Achieves near-zero downtime deployments with rapid container swapping, plus automatic OOM (Out of Memory) crash prevention by creating Swap space on low-RAM servers.
-- **🔒 Auto SSL (HTTPS):** Automatically requests and configures free Let's Encrypt SSL certificates (via Certbot) when a custom domain is provided.
-- **📊 Real-time Observability:** Instantly view container CPU/RAM stats or stream live application logs (stdout/stderr) right inside your local terminal.
+Deploy full-stack Next.js, React, Node, Python, and Static apps instantly, right from your desktop, without paying for expensive cloud providers.
 
 ---
 
-## 🛠️ Installation
+## ✨ What's New in vNext?
 
-**Requirements:**
-- **Local Machine:** Node.js (v18 or higher)
-- **Remote Server:** A Linux VPS (Ubuntu/Debian recommended) with Docker, Docker Compose, and Git installed.
-
-Install the CLI globally using npm:
-
-```bash
-npm install -g autoflow-cli
-```
+- **🖥️ Dual Architecture (UI + CLI):** Manage deployments via the gorgeous graphical Desktop App, or type `autoflow deploy` in your terminal. They share the exact same state, so you can switch seamlessly!
+- **📦 Pure Standalone CLI:** The CLI is now bundled into a single, zero-dependency `cli.js` file (~2.2MB). It runs instantly on Windows, Mac, and Linux without bloating your system.
+- **🔐 AES-256 Vault:** Your SSH keys, passwords, and `.env` variables are completely encrypted on your local hard drive. 
+- **🛡️ 1GB RAM Stability:** Built-in OOM (Out-of-Memory) crash prevention dynamically provisions and verifies Swap space so you can run Docker builds on the cheapest $4/month servers.
+- **🌐 Cross-Platform Installer:** The Desktop App can natively inject the CLI wrapper into your `PATH` across Windows PowerShell, macOS/Linux Zsh, Bash, and Fish!
 
 ---
 
 ## 🚀 Getting Started
 
-Deploying your app is as easy as running a few simple commands!
+### Option 1: The Desktop App
+1. Download and run the `AutoFlow` executable for your OS.
+2. Complete the step-by-step Onboarding Wizard to connect your VPS.
+3. Click **"Add Project"**, select your local folder, and hit **"Deploy"**!
 
-### 1️⃣ Global Setup (Run Once)
-Setup your VPS details globally so you never have to re-enter them for other projects.
-```bash
-autoflow setup
-```
-*(You will be prompted for: Server IP, SSH Username, SSH Port, and SSH Private Key path)*
+### Option 2: The Standalone CLI
+Since AutoFlow vNext is entirely **NPM-free**, you no longer need to download packages from npm!
 
-### 2️⃣ Initialize Project
-Navigate to your project directory and initialize AutoFlow. It will automatically detect your project's framework and set up necessary configurations.
-```bash
-cd my-awesome-app
-autoflow init
-```
-*(Prompts for: Project Name, Git Repository URL, and optionally a Domain name)*
+1. Open the **AutoFlow Desktop App**.
+2. Navigate to **Settings** -> **Terminal Integration**.
+3. Click **"Install Global CLI"**.
+4. The app will natively inject the `autoflow` command directly into your terminal (supporting PowerShell, Zsh, Bash, and Fish).
 
-### 3️⃣ Deploy!
-Push your code to Git, build it on the remote server, and deploy it automatically.
-```bash
-autoflow deploy
-```
-**What happens under the hood?**
-1. Auto-commits and pushes local changes to your Git repository.
-2. Connects securely to your VPS via SSH.
-3. Pulls the latest code on the server.
-4. Builds a fresh isolated Docker Image.
-5. Configures Nginx and provisions SSL (if domain was configured in `init`).
-6. Boots the new container effortlessly.
-
-### 4️⃣ Monitor and Manage
-
-Check the live stats (CPU/Memory/Status) of your running container:
-```bash
-autoflow status
-```
-
-Need to gracefully stop and clean up the application?
-```bash
-autoflow stop
-```
+1. **Initialize a Project:**
+   ```bash
+   cd my-awesome-app
+   autoflow init
+   ```
+2. **Deploy it:**
+   ```bash
+   autoflow deploy
+   ```
 
 ---
 
-## ⚙️ Architecture Pipeline
+## ⚙️ How It Works Under The Hood
 
-**AutoFlow operates using a `Local -> Git -> Remote` pipeline:**
+AutoFlow establishes a highly secure, automated pipeline straight to your VPS:
 
-1. **Local:** You run `autoflow deploy`. Your local code is synced/pushed automatically to your Git provider (GitHub/GitLab/Bitbucket).
-2. **Remote:** AutoFlow SSHs into your VPS securely from your local machine.
-3. **Build:** The server pulls the latest Git code into a temp directory and executes an optimal Docker build.
-4. **Serve:** Docker containers are created or restarted, and live Nginx routing rules are updated automatically.
-
----
-
-## 🔒 Security Best Practices
-
-AutoFlow is designed with security in mind to protect your server and project credentials:
-
-- **Environment Variables (.env) Support:** AutoFlow securely parses and manages `.env` files for your sensitive configuration (e.g., API keys, database strings). `.env` files are injected at build/runtime and are securely handled without compromising your public Git repository.
-- **SSH Key Authentication:** Authenticates with your remote server using secure OpenSSH private keys instead of passwords. Your keys remain strictly on your local machine.
-- **Isolated Deployments:** Each application runs in its own isolated Docker container.
-- **Auto-Configured SSL:** Automatic HTTPS via Let's Encrypt ensures encrypted traffic between users and your application out of the box.
+1. **Secure Sync:** Decrypts your Vault credentials and securely syncs your local code to the VPS over an SSH/SFTP stream.
+2. **Environment Injection:** Safely parses and injects your `.env` variables (e.g., Database URLs) directly into the deployment context without exposing them.
+3. **Atomic Docker Builds:** Generates an optimal `Dockerfile` for your framework and builds it on the server, leveraging layer caching for speed.
+4. **Zero-Downtime Swap:** Stops the old container and boots the new one instantly.
+5. **Auto-SSL:** Configures Nginx routing and automatically provisions Let's Encrypt HTTPS certificates for your custom domains.
 
 ---
 
-## 🖥️ Desktop App Packaging
+## 🔒 Security & Compliance
 
-AutoFlow includes an Electron desktop wrapper for graphical management of deployments.
-To build the desktop application for distribution:
+We take security seriously. AutoFlow has passed rigorous micro-audits to ensure:
+- **Strict Shell Injection Resistance:** All remote commands are fully sanitized via `escapeShellArg` strict escaping, neutralizing payload attacks.
+- **State Integrity:** Local state resolves securely to `~/.autoflow/config.json`, keeping your server profiles perfectly synchronized and protected behind Vault locks.
+- **Path Isolation:** The Windows installer strictly targets `User` scope registries to prevent OS-level Machine Path corruption.
 
-1. Run `npm run dist` to package binaries using `electron-builder`.
-2. **macOS Note (Notarization):** To prevent Gatekeeper warnings on macOS, you must digitally sign and notarize the `.dmg` and `.zip` files. Set up your Apple Developer certificates and configure `afterSign: "scripts/notarize.js"` in the `package.json` build config before shipping to users.
+---
+
+## 🛠️ Development & Building
+
+Want to contribute or compile AutoFlow yourself?
+
+```bash
+# Install dependencies
+npm install
+
+# Build the Standalone CLI (Output: dist/cli.js)
+npm run build:cli
+
+# Build the Desktop Application
+npm run build
+
+# Package the installers (exe, dmg, AppImage)
+npm run dist
+```
 
 ---
 
 ## 💡 Troubleshooting
 
-- **Permissions Error (Linux/Mac):** Ensure your private SSH key has proper permissions: `chmod 600 ~/.ssh/id_rsa`.
-- **Node Version:** Ensure you're running Node.js `>= 18`. You can check with `node -v`.
-- **Server Memory:** If deployments fail unexpectedly during build, ensure your VPS has at least 1GB of RAM or available swap space (AutoFlow tries to allocate swap automatically but some hosts restrict this).
+- **Server Memory Crashes:** If builds freeze, ensure your server has at least 1GB of RAM. AutoFlow automatically creates swap space, but some restrictive host providers block this.
+- **Fish Shell Users:** AutoFlow natively supports `fish`. If `autoflow` isn't recognized, simply type `source ~/.config/fish/config.fish` or restart your terminal.
 
 ---
 
 ## 📜 License
 
-This project is licensed under the MIT License.
+This project is licensed under the **MIT License**. Build, modify, and deploy freely!
