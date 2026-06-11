@@ -2,7 +2,6 @@
 
 import { Command } from 'commander';
 import chalk from 'chalk';
-import figlet from 'figlet';
 
 import init from '../src/commands/init';
 import deploy from '../src/commands/deploy/index';
@@ -12,12 +11,16 @@ import setup from '../src/commands/setup';
 
 const program = new Command();
 
+const BANNER = `
+    ___   __  __________  ________    ____ _       __
+   /   | / / / /_  __/ / / / ____/   / __ \\ |     / /
+  / /| |/ / / / / / / / / / /_      / / / / | /| / / 
+ / ___ / /_/ / / / / /_/ / __/     / /_/ /| |/ |/ /  
+/_/  |_\\____/ /_/  \\____/_/        \\____/ |__/|__/   
+`;
+
 // Banner
-console.log(
-    chalk.cyan(
-        figlet.textSync('AUTOFLOW', { horizontalLayout: 'full' })
-    )
-);
+console.log(chalk.cyan(BANNER));
 
 program
     .name('autoflow')
