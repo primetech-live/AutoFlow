@@ -39,7 +39,10 @@
       "allowToChangeInstallationDirectory": true
     },
     "mac": {
-      "target": ["dmg", "zip"],
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "hardenedRuntime": true,
       "gatekeeperAssess": false
     },
@@ -59,7 +62,7 @@
     "ssh",
     "cicd"
   ],
-  "author": "Keval Parmar",
+  "author": "PrimeTech",
   "license": "MIT",
   "files": [
     "bin",
