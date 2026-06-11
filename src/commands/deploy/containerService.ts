@@ -2,6 +2,7 @@ import { NodeSSH } from 'node-ssh';
 import chalk from 'chalk';
 import log from '../../utils/logger';
 import { exec, AutoFlowError, EXIT_CODES } from './errors';
+import { escapeShellArg } from '../../utils/shell';
 
 export async function startContainer(
     ssh: NodeSSH,
@@ -15,7 +16,7 @@ export async function startContainer(
     volumes: string[] = []
 ): Promise<void> {
     // Stop and remove old container if running
-    await ssh.execCommand(`docker rm -f ${containerName} || true`);
+    await ssh.execCommand(`docker rm -f ${escapeShellArg(containerName)} || true`);
 
     const portBinding = useDomain
         ? `-p 127.0.0.1:${hostPort}:${containerPort}`
@@ -39,8 +40,8 @@ export async function startContainer(
             }
 
             // Ensure host directory exists
-            await ssh.execCommand(`mkdir -p ${host}`);
-            volumeBinding += `-v ${host}:${container} `;
+            await ssh.execCommand(`mkdir -p ${escapeShellArg(host)}`);
+            volumeBinding += `-v ${escapeShellArg(host)}:${escapeShellArg(container)} `;
         }
     }
 
@@ -56,12 +57,12 @@ export async function startContainer(
         '--restart unless-stopped',
         portBinding,
         volumeBinding.trim(),
-        `--name ${containerName}`,
+        `--name ${escapeShellArg(containerName)}`,
         envLine,
-        imageName
+        escapeShellArg(imageName)
     ].filter(Boolean).join(' ');
 
-    await exec(ssh, `cd ${projectDir} && ${runCmd}`);
+    await exec(ssh, `cd ${escapeShellArg(projectDir)} && ${runCmd}`);
 }
 
 export async function verifyContainerHealth(
@@ -74,11 +75,11 @@ export async function verifyContainerHealth(
     await new Promise((resolve) => setTimeout(resolve, 3000));
 
     const ps = await ssh.execCommand(
-        `docker ps --filter "name=${containerName}" --format "{{.Status}}"`
+        `docker ps --filter "name=${escapeShellArg(containerName)}" --format "{{.Status}}"`
     );
 
     if (!ps.stdout || !ps.stdout.includes('Up')) {
-        const logs = await ssh.execCommand(`docker logs --tail 25 ${containerName}`);
+        const logs = await ssh.execCommand(`docker logs --tail 25 ${escapeShellArg(containerName)}`);
         console.log(chalk.red('\n=== CONTAINER LOGS (last 25 lines) ==='));
         console.log(chalk.red(logs.stdout || logs.stderr));
         console.log(chalk.red('======================================\n'));

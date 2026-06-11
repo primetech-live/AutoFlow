@@ -13,12 +13,16 @@ export interface VaultConfig {
     passwordHash: string;
     totpSecret: string;
     salt: string;
+    sshPassword?: string;
+    projectTokens?: Record<string, string>;
 }
 
 export class VaultEngine extends EventEmitter {
     private sessionPassword: string | null = null;
     private lastActivityTimestamp: number = 0;
     private idleTimer: NodeJS.Timeout | null = null;
+    private failedAttempts: number = 0;
+    private lockoutUntil: number = 0;
 
     constructor() {
         super();
@@ -81,6 +85,11 @@ export class VaultEngine extends EventEmitter {
      * Attempts to unlock the vault session
      */
     public unlock(password: string, otpToken: string): boolean {
+        if (Date.now() < this.lockoutUntil) {
+            const remaining = Math.ceil((this.lockoutUntil - Date.now()) / 1000);
+            throw new Error(`Vault locked due to too many failed attempts. Try again in ${remaining} seconds.`);
+        }
+
         const vault = this.loadVaultConfig();
         if (!vault) {
             throw new Error('Vault has not been set up yet. Run onboarding first.');
@@ -89,6 +98,7 @@ export class VaultEngine extends EventEmitter {
         // Verify password
         const hashed = this.hashPassword(password, vault.salt);
         if (hashed !== vault.passwordHash) {
+            this.handleFailedAttempt();
             return false;
         }
 
@@ -101,13 +111,24 @@ export class VaultEngine extends EventEmitter {
         });
 
         if (verified) {
+            this.failedAttempts = 0;
             this.sessionPassword = password;
             this.resetActivity();
             this.emit('lock-state-change', false);
             return true;
         }
 
+        this.handleFailedAttempt();
         return false;
+    }
+
+    private handleFailedAttempt() {
+        this.failedAttempts++;
+        if (this.failedAttempts >= 5) {
+            this.lockoutUntil = Date.now() + 15 * 60 * 1000; // 15 mins
+            this.failedAttempts = 0;
+            throw new Error('Vault locked due to too many failed attempts. Try again in 15 minutes.');
+        }
     }
 
     /**

@@ -2,6 +2,7 @@ import { NodeSSH } from 'node-ssh';
 import chalk from 'chalk';
 import log from '../utils/logger';
 import { loadGlobalConfig, loadProjectConfig } from '../utils/config';
+import { escapeShellArg } from '../utils/shell';
 
 async function status(): Promise<void> {
     const projectConfig = loadProjectConfig();
@@ -22,10 +23,11 @@ async function status(): Promise<void> {
         });
 
         const container = config.projectName;
+        const safeContainer = escapeShellArg(container);
 
         // 1. Container inspect
         const inspect = await ssh.execCommand(
-            `docker inspect --format '{{.State.Status}}|{{.State.Running}}|{{.State.StartedAt}}' ${container}`
+            `docker inspect --format '{{.State.Status}}|{{.State.Running}}|{{.State.StartedAt}}' ${safeContainer}`
         );
         const [containerStatus, running, startedAt] = inspect.stdout.trim().split('|');
 
@@ -50,7 +52,7 @@ async function status(): Promise<void> {
         if (isRunning) {
             // 2. Resource metrics
             const stats = await ssh.execCommand(
-                `docker stats --no-stream --format "{{.CPUPerc}}|{{.MemUsage}}" ${container}`
+                `docker stats --no-stream --format "{{.CPUPerc}}|{{.MemUsage}}" ${safeContainer}`
             );
             const [cpu, mem] = stats.stdout.trim().split('|');
 
@@ -60,8 +62,17 @@ async function status(): Promise<void> {
             console.log(`  RAM: ${chalk.cyan(mem)}`);
 
             // 3. Internal health check
+            const portCmd = await ssh.execCommand(`docker port ${safeContainer}`);
+            let mappedPort = '3000';
+            if (portCmd.stdout) {
+                const match = portCmd.stdout.match(/0\.0\.0\.0:(\d+)/) || portCmd.stdout.match(/127\.0\.0\.1:(\d+)/);
+                if (match && match[1]) {
+                    mappedPort = match[1];
+                }
+            }
+
             const health = await ssh.execCommand(
-                `curl -I -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3000`
+                `curl -I -s -o /dev/null -w "%{http_code}" http://127.0.0.1:${mappedPort}`
             );
             const httpCode = health.stdout.trim();
             const healthColor = httpCode === '200' ? chalk.green : chalk.yellow;
@@ -69,7 +80,7 @@ async function status(): Promise<void> {
             console.log(chalk.gray('--------------------------------------------------'));
 
             // 4. Recent logs
-            const logs = await ssh.execCommand(`docker logs --tail 5 ${container}`);
+            const logs = await ssh.execCommand(`docker logs --tail 5 ${safeContainer}`);
             console.log(chalk.bold('RECENT LOGS:'));
             console.log(chalk.gray(logs.stdout || logs.stderr));
         }

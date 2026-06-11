@@ -140,6 +140,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
     const [envVars, setEnvVars] = useState<Array<{ key: string; value: string; masked: boolean }>>([]);
     const [newKey, setNewKey] = useState('');
     const [newValue, setNewValue] = useState('');
+    const [gitPat, setGitPat] = useState('');
 
     // History state
     const [history, setHistory] = useState<any[]>([]);
@@ -223,6 +224,12 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                     mode: domain ? 'domain' : 'port',
                     strictCI
                 });
+                
+                if (gitPat.trim()) {
+                    await window.autoflow.invoke('vault:save-git-pat', projectName, gitPat.trim());
+                    setGitPat(''); // clear field after save
+                }
+                
                 setSuccessMsg('Project configuration saved successfully.');
             }
             onRefreshProjects();
@@ -457,6 +464,19 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                             />
                         </div>
 
+                        {gitRepo && (
+                            <div className="form-group">
+                                <label className="form-label">Git Token (PAT - For Private Repos)</label>
+                                <input 
+                                    type="password"
+                                    placeholder="Leave empty to keep existing token"
+                                    className="input"
+                                    value={gitPat}
+                                    onChange={(e) => setGitPat(e.target.value)}
+                                />
+                            </div>
+                        )}
+
                         <div className="form-group">
                             <label className="form-label">Domain configuration (Nginx Reverse Proxy)</label>
                             <input 
@@ -480,6 +500,8 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                                     <option value="static">Static Frontend (HTML, React Build)</option>
                                     <option value="python">Python API (Flask, FastAPI)</option>
                                     <option value="go">Go Executable</option>
+                                    <option value="vue">Vue.js</option>
+                                    <option value="nuxt">Nuxt.js</option>
                                 </select>
                             </div>
                             

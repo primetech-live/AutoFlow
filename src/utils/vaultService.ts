@@ -11,6 +11,8 @@ export interface VaultConfig {
     passwordHash: string;
     totpSecret: string;
     salt: string;
+    sshPassword?: string;
+    projectTokens?: Record<string, string>;
 }
 
 /**

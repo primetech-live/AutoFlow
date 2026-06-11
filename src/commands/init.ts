@@ -3,6 +3,9 @@ import fs from 'fs';
 import log from '../utils/logger';
 import { saveProjectConfig, loadGlobalConfig } from '../utils/config';
 import path from 'path';
+import { execSync } from 'child_process';
+import { loadVaultConfig, saveVaultConfig } from '../utils/vaultService';
+import { vaultEngine } from '../core/vault';
 
 async function init(): Promise<void> {
   log.header('AUTOFLOW INITIALIZATION');
@@ -18,6 +21,7 @@ async function init(): Promise<void> {
     projectName: string;
     gitRepo: string;
     domain: string;
+    branch: string;
     strictCI: boolean;
   }>([
     {
@@ -25,9 +29,16 @@ async function init(): Promise<void> {
       name: 'projectName',
       message: 'Project name:',
       default: path.basename(process.cwd()).toLowerCase().replace(/\s+/g, '-'),
+      validate: (input) => {
+        if (!/^[a-z0-9-]+$/i.test(input)) {
+          return 'Project name can only contain alphanumeric characters and dashes.';
+        }
+        return true;
+      }
     },
     { type: 'input', name: 'gitRepo', message: 'GitHub repository URL:' },
     { type: 'input', name: 'domain', message: 'Domain / Subdomain (leave empty for IP:PORT mode):' },
+    { type: 'input', name: 'branch', message: 'Git Branch to deploy:', default: 'main' },
     {
       type: 'confirm',
       name: 'strictCI',
@@ -35,6 +46,47 @@ async function init(): Promise<void> {
       default: true,
     },
   ]);
+
+  try {
+    execSync(`git ls-remote ${answers.gitRepo}`, { stdio: 'ignore' });
+  } catch (e) {
+    log.warning('\nPrivate repository detected (authentication required).');
+    const { pat } = await inquirer.prompt<{ pat: string }>([{
+      type: 'password',
+      name: 'pat',
+      message: 'Enter a Personal Access Token (PAT) for Git (leave empty to configure later):',
+      mask: '*'
+    }]);
+
+    if (pat) {
+      let vault = loadVaultConfig();
+      if (!vault) {
+        log.warning('Vault not set up. Run "autoflow setup-vault" first to securely store Git tokens.');
+      } else {
+        log.header('Z+ SECURITY CHALLENGE');
+        const { password } = await inquirer.prompt([{
+            type: 'password',
+            name: 'password',
+            message: 'Enter Master Deployment Password to encrypt token:',
+            mask: '*'
+        }]);
+        const { token } = await inquirer.prompt([{
+            type: 'input',
+            name: 'token',
+            message: 'Enter 6-digit OTP from your phone:',
+        }]);
+
+        if (vaultEngine.unlock(password, token)) {
+            if (!vault.projectTokens) vault.projectTokens = {};
+            vault.projectTokens[answers.projectName] = vaultEngine.encrypt(pat);
+            saveVaultConfig(vault);
+            log.success('✔ Git token securely encrypted and saved to Vault.');
+        } else {
+            log.error('Invalid Vault credentials. Token not saved.');
+        }
+      }
+    }
+  }
 
   /* ── Smart Detection Engine ─────────────────────────────────────── */
   let appType = 'node';
@@ -121,6 +173,12 @@ async function init(): Promise<void> {
     } else if (deps['@angular/cli']) {
       appType = 'angular'; buildCommand = `${runCmd} build`; startCommand = 'npx -y serve -s dist/browser -l 3000';
       log.info('✨ Detected: Angular');
+    } else if (deps.nuxt) {
+      appType = 'nuxt'; buildCommand = `${runCmd} build`; startCommand = 'node .output/server/index.mjs';
+      log.info('✨ Detected: Nuxt.js');
+    } else if (deps.vue) {
+      appType = 'vue'; buildCommand = `${runCmd} build`; startCommand = 'npx -y serve -s dist -l tcp://0.0.0.0:3000';
+      log.info('✨ Detected: Vue.js');
     } else {
       appType = 'node';
       log.info('✨ Detected: Node.js / Express');
@@ -172,6 +230,7 @@ async function init(): Promise<void> {
     appType,
     deploymentType: 'docker',
     mode: answers.domain ? 'domain' : 'port',
+    branch: answers.branch || 'main',
     strictCI: answers.strictCI,
     volumes: volumes.length > 0 ? volumes : undefined,
   });
@@ -357,7 +416,7 @@ CMD ${JSON.stringify(startCommand.split(' '))}`;
   if (!fs.existsSync('.dockerignore')) {
     const baseIgnore = `.git\n.env\nautoflow.config.json${dockerignoreExtras}`;
     // Add node_modules only for JS-based projects
-    const nodeIgnore = ['node', 'next', 'vite', 'react', 'angular'].includes(appType)
+    const nodeIgnore = ['node', 'next', 'nuxt', 'vue', 'vite', 'react', 'angular'].includes(appType)
       ? '\nnode_modules\ndist\nbuild'
       : '';
     fs.writeFileSync('.dockerignore', baseIgnore + nodeIgnore);

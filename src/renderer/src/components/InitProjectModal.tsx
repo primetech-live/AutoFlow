@@ -7,6 +7,7 @@ interface InitOptions {
     domain: string;
     strictCI: boolean;
     useVolumes: boolean;
+    gitPat?: string;
 }
 
 interface InitProjectModalProps {
@@ -24,15 +25,25 @@ export const InitProjectModal: React.FC<InitProjectModalProps> = ({ projectPath,
     const [domain, setDomain] = useState('');
     const [strictCI, setStrictCI] = useState(true);
     const [useVolumes, setUseVolumes] = useState(false);
+    const [gitPat, setGitPat] = useState('');
+    const [error, setError] = useState('');
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        setError('');
+        
+        if (!/^[a-z0-9-]+$/i.test(projectName)) {
+            setError('Project name can only contain alphanumeric characters and dashes.');
+            return;
+        }
+
         onConfirm({
             projectName,
             gitRepo,
             domain,
             strictCI,
-            useVolumes
+            useVolumes,
+            gitPat: gitPat.trim() || undefined
         });
     };
 
@@ -63,6 +74,7 @@ export const InitProjectModal: React.FC<InitProjectModalProps> = ({ projectPath,
                                 onChange={(e) => setProjectName(e.target.value)}
                                 required
                             />
+                            {error && <div style={{ color: 'var(--error)', fontSize: '12px', marginTop: '4px' }}>{error}</div>}
                         </div>
 
                         <div className="form-group">
@@ -75,6 +87,19 @@ export const InitProjectModal: React.FC<InitProjectModalProps> = ({ projectPath,
                                 onChange={(e) => setGitRepo(e.target.value)}
                             />
                         </div>
+
+                        {gitRepo && (
+                            <div className="form-group">
+                                <label className="form-label">Git Personal Access Token (For Private Repos)</label>
+                                <input
+                                    type="password"
+                                    className="input"
+                                    placeholder="ghp_xxxxxxxxxxxx"
+                                    value={gitPat}
+                                    onChange={(e) => setGitPat(e.target.value)}
+                                />
+                            </div>
+                        )}
 
                         <div className="form-group">
                             <label className="form-label">Domain / Subdomain (Optional)</label>

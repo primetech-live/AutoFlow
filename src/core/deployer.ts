@@ -177,19 +177,13 @@ export class DeployerEngine extends EventEmitter {
 
             addLogListener(logListener);
 
-            const originalCwd = process.cwd();
             try {
-                // Change directory to the project path so all CLI tools (config, git, etc.) work flawlessly natively
-                process.chdir(projectPath);
-                
                 // Execute directly in main process (100% reliable, zero ASAR spawn bugs)
-                await deployProjectCore(true); // true = isDesktop
+                await deployProjectCore(true, projectPath); // true = isDesktop
             } catch (err: any) {
                 removeLogListener(logListener);
                 throw err;
             } finally {
-                // Always restore the original working directory
-                process.chdir(originalCwd);
                 removeLogListener(logListener);
             }
 

@@ -14,10 +14,14 @@ export const Settings: React.FC<SettingsProps> = ({ onReRunOnboarding, onResetCo
     const [sshUser, setSshUser] = useState('');
     const [sshPort, setSshPort] = useState('22');
     const [sshKeyPath, setSshKeyPath] = useState('');
+    const [sshPassword, setSshPassword] = useState('');
 
     const [loading, setLoading] = useState(false);
     const [saveStatus, setSaveStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
     const [showDependencyInstaller, setShowDependencyInstaller] = useState(false);
+
+    const [cliStatus, setCliStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+    const [installingCli, setInstallingCli] = useState(false);
 
     // Fetch existing settings on load
     useEffect(() => {
@@ -66,6 +70,10 @@ export const Settings: React.FC<SettingsProps> = ({ onReRunOnboarding, onResetCo
                 sshPort,
                 sshKeyPath
             });
+            if (sshPassword) {
+                await window.autoflow.invoke('vault:save-ssh-password', sshPassword);
+                setSshPassword(''); // Clear for security
+            }
             // Reconnect SSH with the new settings
             await window.autoflow.disconnectFromServer();
             await window.autoflow.connectToServer();
@@ -74,6 +82,23 @@ export const Settings: React.FC<SettingsProps> = ({ onReRunOnboarding, onResetCo
             setSaveStatus({ type: 'error', message: err.message || 'Failed to save configuration.' });
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleInstallCli = async () => {
+        setInstallingCli(true);
+        setCliStatus(null);
+        try {
+            const result = await window.autoflow.installCli();
+            if (result.success) {
+                setCliStatus({ type: 'success', message: result.message || 'CLI installed successfully.' });
+            } else {
+                setCliStatus({ type: 'error', message: result.error || 'Failed to install CLI.' });
+            }
+        } catch (err: any) {
+            setCliStatus({ type: 'error', message: err.message || 'An unexpected error occurred.' });
+        } finally {
+            setInstallingCli(false);
         }
     };
 
@@ -188,6 +213,17 @@ export const Settings: React.FC<SettingsProps> = ({ onReRunOnboarding, onResetCo
                             </div>
                         </div>
 
+                        <div className="form-group" style={{ marginBottom: '12px' }}>
+                            <label className="form-label">SSH Password Fallback (Optional, securely stored in Vault)</label>
+                            <input
+                                type="password"
+                                placeholder="Leave empty to keep existing password"
+                                className="input"
+                                value={sshPassword}
+                                onChange={(e) => setSshPassword(e.target.value)}
+                            />
+                        </div>
+
                         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
                             <button
                                 type="submit"
@@ -232,6 +268,38 @@ export const Settings: React.FC<SettingsProps> = ({ onReRunOnboarding, onResetCo
                             style={{ width: '100%', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                         >
                             <DownloadIcon size={14} /> Run Dependency Check
+                        </button>
+                    </div>
+
+                    <div className="card">
+                        <h3 className="h2" style={{ fontSize: '15px', marginBottom: '12px' }}>
+                            Terminal Integration
+                        </h3>
+                        <p className="text-secondary" style={{ fontSize: '12.5px', lineHeight: '1.5', marginBottom: '16px' }}>
+                            Install the standalone AutoFlow CLI globally so you can run 'autoflow' directly from your terminal.
+                        </p>
+                        {cliStatus && (
+                            <div style={{
+                                background: cliStatus.type === 'success' ? 'var(--accent-glow)' : 'var(--error-glow)',
+                                color: cliStatus.type === 'success' ? 'var(--accent)' : 'var(--error)',
+                                padding: '8px',
+                                borderRadius: '4px',
+                                fontSize: '12px',
+                                marginBottom: '12px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                            }}>
+                                {cliStatus.message}
+                            </div>
+                        )}
+                        <button
+                            onClick={handleInstallCli}
+                            disabled={installingCli}
+                            className="btn btn-secondary"
+                            style={{ width: '100%', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                        >
+                            {installingCli ? 'Installing...' : 'Install Global CLI'}
                         </button>
                     </div>
 

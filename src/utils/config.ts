@@ -16,6 +16,7 @@ export interface ProjectConfig {
     appType: string;
     deploymentType: string;
     mode: 'domain' | 'port';
+    branch?: string;
     strictCI?: boolean;
     volumes?: string[];
 }
@@ -30,16 +31,16 @@ export function loadGlobalConfig(): GlobalConfig {
     return JSON.parse(fs.readFileSync(globalConfigPath, 'utf-8')) as GlobalConfig;
 }
 
-export function loadProjectConfig(): ProjectConfig {
-    const configPath = path.join(process.cwd(), 'autoflow.config.json');
+export function loadProjectConfig(projectDir: string = process.cwd()): ProjectConfig {
+    const configPath = path.join(projectDir, 'autoflow.config.json');
     if (!fs.existsSync(configPath)) {
         throw new Error('Project config missing! Run "autoflow init" first.');
     }
     return JSON.parse(fs.readFileSync(configPath, 'utf-8')) as ProjectConfig;
 }
 
-export function saveProjectConfig(config: Partial<ProjectConfig>): void {
-    fs.writeFileSync('autoflow.config.json', JSON.stringify(config, null, 2));
+export function saveProjectConfig(config: Partial<ProjectConfig>, projectDir: string = process.cwd()): void {
+    fs.writeFileSync(path.join(projectDir, 'autoflow.config.json'), JSON.stringify(config, null, 2));
 }
 
 export function saveGlobalConfig(config: GlobalConfig): void {

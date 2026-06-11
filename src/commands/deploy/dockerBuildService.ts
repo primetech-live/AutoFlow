@@ -1,6 +1,7 @@
 import { NodeSSH } from 'node-ssh';
 import log from '../../utils/logger';
 import { exec, AutoFlowError, EXIT_CODES } from './errors';
+import { escapeShellArg } from '../../utils/shell';
 
 export async function buildDockerImage(
     ssh: NodeSSH,
@@ -12,8 +13,9 @@ export async function buildDockerImage(
 
     try {
         await exec(ssh, `
-cd ${projectDir} &&
-docker build --no-cache --progress=plain -t ${imageName} .
+cd ${escapeShellArg(projectDir)} &&
+docker build --progress=plain -t ${escapeShellArg(imageName)} . &&
+docker image prune -f
 `, 600_000, true); // 10-minute timeout for large builds, with streaming logs
 
         log.success(`Docker image built: ${imageName} ✔`);

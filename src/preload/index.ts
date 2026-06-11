@@ -80,6 +80,9 @@ export interface AutoflowApi {
     checkDependencies: () => Promise<{ pkgManager: string; deps: any[] }>;
     installDependencies: (depsToInstall: string[], pkgManager: string) => Promise<{ success: boolean }>;
     onInstallerLog: (callback: (log: string) => void) => void;
+
+    // CLI Integration
+    installCli: () => Promise<{ success: boolean; message?: string; error?: string }>;
 }
 
 const api: AutoflowApi = {
@@ -191,7 +194,10 @@ const api: AutoflowApi = {
     installDependencies: (deps, pkgManager) => ipcRenderer.invoke('installer:install-dependencies', deps, pkgManager),
     onInstallerLog: (callback) => {
         ipcRenderer.on('installer:log', (_, log) => callback(log));
-    }
+    },
+
+    // CLI Integration
+    installCli: () => ipcRenderer.invoke('install-cli')
 };
 
 contextBridge.exposeInMainWorld('autoflow', api);

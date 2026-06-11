@@ -10,8 +10,8 @@ import { vaultEngine } from '../../core/vault';
 /**
  * Handles the secure traversal of environment variables
  */
-export async function syncEnv(ssh: NodeSSH, projectDir: string): Promise<string | null> {
-    const envPath = path.join(process.cwd(), '.env');
+export async function syncEnv(ssh: NodeSSH, projectDir: string, localProjectDir: string = process.cwd()): Promise<string | null> {
+    const envPath = path.join(localProjectDir, '.env');
 
     if (!fs.existsSync(envPath)) {
         log.warning('No .env file found locally. Skipping environment sync.');
@@ -33,51 +33,23 @@ export async function syncEnv(ssh: NodeSSH, projectDir: string): Promise<string 
         password = sessionPassword;
         log.success('✔ Identity verified from active vault session. Encrypting payload...');
     } else {
-        log.header('Z+ SECURITY CHALLENGE');
-
-        // 1. Password Challenge
-        const answers = await inquirer.prompt([{
-            type: 'password',
-            name: 'password',
-            message: 'Enter Master Deployment Password:',
-            mask: '*'
-        }]);
-        password = answers.password;
-
-        if (hashPassword(password, vault.salt) !== vault.passwordHash) {
-            throw new AutoFlowError('Incorrect master password.', EXIT_CODES.CI_FAILED, 'vault');
-        }
-
-        // 2. OTP Challenge
-        const { token } = await inquirer.prompt([{
-            type: 'input',
-            name: 'token',
-            message: 'Enter 6-digit OTP from your phone:',
-        }]);
-
-        if (!verifyOTP(token, vault.totpSecret)) {
-            throw new AutoFlowError('Invalid OTP code.', EXIT_CODES.CI_FAILED, 'vault');
-        }
-
-        log.success('✔ Z+ Identity Verified. Encrypting payload...');
+        throw new AutoFlowError('Vault session is locked. Expected unlock earlier.', EXIT_CODES.CI_FAILED, 'vault');
     }
 
-    // 3. Encrypt & Prep Traversal
+    // 3. Secure Transfer (SFTP Stream)
+    log.info('Securing environment variables...');
     const envContent = fs.readFileSync(envPath, 'utf-8');
-    const encryptedBlob = encrypt(envContent, password, vault.salt);
+    const finalEnvPath = `${projectDir}/.env`;
 
-    // 4. Secure Transfer (Traversal)
-    log.info('Beaming encrypted payload to server ramdisk...');
+    const sftp = await ssh.requestSFTP();
+    await new Promise<void>((resolve, reject) => {
+        const stream = sftp.createWriteStream(finalEnvPath, { mode: 0o600 });
+        stream.on('close', resolve);
+        stream.on('error', reject);
+        stream.end(envContent);
+    });
 
-    // We create a temporary file on the server
-    const remoteEnvPath = `${projectDir}/.env.tmp`;
-
-    // Write directly to server via SSH (avoids local disk footprint of the encrypted blob if possible, 
-    // but here we just send the string)
-    await ssh.execCommand(`echo "${encryptedBlob}" > ${remoteEnvPath}`);
-    await ssh.execCommand(`chmod 600 ${remoteEnvPath}`);
-
-    log.success('✔ Secure traversal complete. Payload waiting in server memory.');
+    log.success('✔ Secrets securely transferred via SFTP stream.');
     return password;
 }
 
@@ -85,32 +57,9 @@ export async function syncEnv(ssh: NodeSSH, projectDir: string): Promise<string 
  * Decrypts the blob on the server directly before container start
  */
 export async function unlockEnvOnServer(ssh: NodeSSH, projectDir: string, password: string, salt: string): Promise<void> {
-    const remoteEnvPath = `${projectDir}/.env.tmp`;
-    const finalEnvPath = `${projectDir}/.env`;
-
-    log.info('Unlocking secrets on server...');
-
-    // In a real Z+ scenario, we would decrypt in RAM, but for this implementation 
-    // we'll write to a 600 file temporarily and let Docker handle it.
-    // We send a small script to decrypt it server-side or we decrypt locally and send.
-    // Since we want Z+ security, we will decrypt locally and write it to a 600 file 
-    // just-in-time for docker run.
-
-    const blobResult = await ssh.execCommand(`cat ${remoteEnvPath}`);
-    if (blobResult.code !== 0) return; // No env to unlock
-
-    try {
-        const { decrypt } = require('../../utils/vaultService');
-        const decrypted = decrypt(blobResult.stdout.trim(), password, salt);
-
-        // Write the decrypted .env to a 600 file
-        await ssh.execCommand(`cat <<EOF > ${finalEnvPath}\n${decrypted}\nEOF`);
-        await ssh.execCommand(`chmod 600 ${finalEnvPath}`);
-
-        log.success('✔ Secrets unlocked and ready.');
-    } catch (err) {
-        throw new AutoFlowError('Failed to decrypt server-side blob.', EXIT_CODES.CI_FAILED, 'vault');
-    }
+    // With the new SFTP stream approach, secrets are already securely placed in .env
+    // This function remains for interface compatibility but requires no action.
+    log.success('✔ Secrets unlocked and ready.');
 }
 
 /**
@@ -118,6 +67,6 @@ export async function unlockEnvOnServer(ssh: NodeSSH, projectDir: string, passwo
  */
 export async function cleanupEnv(ssh: NodeSSH, projectDir: string): Promise<void> {
     log.info('Cleaning up temporary secrets...');
-    await ssh.execCommand(`rm -f ${projectDir}/.env.tmp ${projectDir}/.env`);
+    await ssh.execCommand(`rm -f ${projectDir}/.env`);
     log.success('✔ Server-side disk is clean.');
 }

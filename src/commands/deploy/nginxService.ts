@@ -2,6 +2,7 @@ import { NodeSSH } from 'node-ssh';
 import path from 'path';
 import log from '../../utils/logger';
 import { exec, AutoFlowError, EXIT_CODES } from './errors';
+import { escapeShellArg } from '../../utils/shell';
 
 export async function configureNginx(
     ssh: NodeSSH,
@@ -35,8 +36,9 @@ server {
 
     // ── Conflict resolution ──────────────────────────────────────────────────
     log.info('Scanning for conflicting Nginx configs...');
+    const safeDomain = escapeShellArg(domain);
     const conflictCheck = await ssh.execCommand(
-        `grep -Rl "${domain}" /etc/nginx/sites-enabled/ 2>/dev/null || true`
+        `grep -Rl ${safeDomain} /etc/nginx/sites-enabled/ 2>/dev/null || true`
     );
 
     if (conflictCheck.stdout.trim()) {

@@ -16,13 +16,13 @@ const DEFAULT_NPM_TEST_SCRIPTS = [
 const FAKE_TEST_REGEX = /echo\s+["'](Error: no test specified|No tests yet)["']\s+&&\s+exit\s+[01]/i;
 
 // ── Static project checks ────────────────────────────────────────────────────
-function runStaticChecks(): void {
+function runStaticChecks(projectDir: string): void {
     log.info('Static project detected. Running static CI checks...\n');
 
     const checks: { label: string; pass: boolean; tip?: string }[] = [];
 
     // 1. index.html must exist
-    const hasIndex = fs.existsSync(`${process.cwd()}/index.html`);
+    const hasIndex = fs.existsSync(`${projectDir}/index.html`);
     checks.push({
         label: 'index.html exists',
         pass: hasIndex,
@@ -30,7 +30,7 @@ function runStaticChecks(): void {
     });
 
     // 2. Dockerfile must exist (autoflow needs it to containerise the site)
-    const hasDockerfile = fs.existsSync(`${process.cwd()}/Dockerfile`);
+    const hasDockerfile = fs.existsSync(`${projectDir}/Dockerfile`);
     checks.push({
         label: 'Dockerfile exists',
         pass: hasDockerfile,
@@ -39,8 +39,8 @@ function runStaticChecks(): void {
 
     // 3. .autoflow.yml / .autoflow.yaml must exist
     const hasConfig =
-        fs.existsSync(`${process.cwd()}/.autoflow.yml`) ||
-        fs.existsSync(`${process.cwd()}/.autoflow.yaml`);
+        fs.existsSync(`${projectDir}/.autoflow.yml`) ||
+        fs.existsSync(`${projectDir}/.autoflow.yaml`);
     checks.push({
         label: '.autoflow.yml config exists',
         pass: hasConfig,
@@ -51,7 +51,7 @@ function runStaticChecks(): void {
     const bigFileDirs = ['public', 'assets', '.'];
     let bigFiles: string[] = [];
     for (const dir of bigFileDirs) {
-        const dirPath = `${process.cwd()}/${dir === '.' ? '' : dir}`;
+        const dirPath = `${projectDir}/${dir === '.' ? '' : dir}`;
         if (!fs.existsSync(dirPath)) continue;
         try {
             const entries = fs.readdirSync(dirPath, { withFileTypes: true });
@@ -109,8 +109,8 @@ function runStaticChecks(): void {
 }
 
 // ── Node / npm project checks ────────────────────────────────────────────────
-async function runNodeChecks(strictCI?: boolean): Promise<void> {
-    const pkgPath = `${process.cwd()}/package.json`;
+async function runNodeChecks(projectDir: string, strictCI?: boolean): Promise<void> {
+    const pkgPath = `${projectDir}/package.json`;
 
     const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8')) as {
         scripts?: Record<string, string>;
@@ -151,7 +151,7 @@ async function runNodeChecks(strictCI?: boolean): Promise<void> {
     log.info('All tests must pass before deployment proceeds...\n');
 
     try {
-        execSync(testCmd, { stdio: 'inherit', cwd: process.cwd() });
+        execSync(testCmd, { stdio: 'inherit', cwd: projectDir });
         log.success('✔ All CI checks passed! Proceeding to deployment...\n');
     } catch {
         throw new AutoFlowError(
@@ -337,10 +337,10 @@ function getGitHubCheckRuns(owner: string, repo: string, sha: string): Promise<G
 
 
 // ── PHP checks ───────────────────────────────────────────────────────────────
-function runPhpChecks(): void {
+function runPhpChecks(projectDir: string): void {
     log.info('PHP project detected. Running PHP CI checks...\n');
 
-    const cwd = process.cwd();
+    const cwd = projectDir;
     const checks: { label: string; pass: boolean; tip?: string }[] = [];
 
     // 1. index.php or public/index.php must exist
@@ -397,9 +397,9 @@ function runPhpChecks(): void {
 }
 
 // ── Python / Django / Flask checks ───────────────────────────────────────────
-function runPythonChecks(): void {
+function runPythonChecks(projectDir: string): void {
     log.info('Python project detected. Running Python CI checks...\n');
-    const cwd = process.cwd();
+    const cwd = projectDir;
     const checks: { label: string; pass: boolean; tip?: string }[] = [
         { label: 'requirements.txt exists', pass: fs.existsSync(`${cwd}/requirements.txt`), tip: 'Create a requirements.txt with your dependencies.' },
         { label: 'Dockerfile exists', pass: fs.existsSync(`${cwd}/Dockerfile`), tip: 'Run "autoflow init" to generate a Dockerfile.' },
@@ -414,9 +414,9 @@ function runPythonChecks(): void {
 }
 
 // ── Ruby / Rails checks ───────────────────────────────────────────────────────
-function runRailsChecks(): void {
+function runRailsChecks(projectDir: string): void {
     log.info('Ruby project detected. Running Ruby CI checks...\n');
-    const cwd = process.cwd();
+    const cwd = projectDir;
     const checks: { label: string; pass: boolean; tip?: string }[] = [
         { label: 'Gemfile exists', pass: fs.existsSync(`${cwd}/Gemfile`), tip: 'A Gemfile is required for Ruby projects.' },
         { label: 'Gemfile.lock exists', pass: fs.existsSync(`${cwd}/Gemfile.lock`), tip: 'Run "bundle install" locally first to generate Gemfile.lock.' },
@@ -432,9 +432,9 @@ function runRailsChecks(): void {
 }
 
 // ── Go checks ─────────────────────────────────────────────────────────────────
-function runGoChecks(): void {
+function runGoChecks(projectDir: string): void {
     log.info('Go project detected. Running Go CI checks...\n');
-    const cwd = process.cwd();
+    const cwd = projectDir;
     const checks: { label: string; pass: boolean; tip?: string }[] = [
         { label: 'go.mod exists', pass: fs.existsSync(`${cwd}/go.mod`), tip: 'Run "go mod init" to initialise the Go module.' },
         { label: 'go.sum exists', pass: fs.existsSync(`${cwd}/go.sum`), tip: 'Run "go mod tidy" to generate go.sum.' },
@@ -450,9 +450,9 @@ function runGoChecks(): void {
 }
 
 // ── Java / Maven checks ───────────────────────────────────────────────────────
-function runJavaChecks(): void {
+function runJavaChecks(projectDir: string): void {
     log.info('Java project detected. Running Java CI checks...\n');
-    const cwd = process.cwd();
+    const cwd = projectDir;
     const checks: { label: string; pass: boolean; tip?: string }[] = [
         { label: 'pom.xml exists', pass: fs.existsSync(`${cwd}/pom.xml`), tip: 'A pom.xml is required for Maven projects.' },
         { label: 'Dockerfile exists', pass: fs.existsSync(`${cwd}/Dockerfile`), tip: 'Run "autoflow init" to generate a Dockerfile.' },
@@ -467,7 +467,7 @@ function runJavaChecks(): void {
 }
 
 // ── Migration Safety Checks ──────────────────────────────────────────────────
-function checkMigrationSafety(): void {
+function checkMigrationSafety(projectDir: string): void {
     const migrationDirs = ['migrations', 'db/migrations', 'database/migrations', 'prisma/migrations'];
     const destructiveKeywords = [/DROP\s+TABLE/i, /TRUNCATE\s+TABLE/i, /DATABASE\s+RESET/i];
     
@@ -476,7 +476,7 @@ function checkMigrationSafety(): void {
     let findings: string[] = [];
     
     for (const dir of migrationDirs) {
-        const dirPath = path.join(process.cwd(), dir);
+        const dirPath = path.join(projectDir, dir);
         if (!fs.existsSync(dirPath)) continue;
         
         try {
@@ -504,49 +504,51 @@ function checkMigrationSafety(): void {
 }
 
 // ── Public entry point ───────────────────────────────────────────────────────
-export async function runCIChecks(appType: string, strictCI?: boolean): Promise<void> {
+export async function runCIChecks(projectDir: string, appType: string, strictCI?: boolean): Promise<void> {
     log.header('LOCAL CI CHECKS');
 
     // Run migration safety check for all non-static apps
     if (appType !== 'static') {
-        checkMigrationSafety();
+        checkMigrationSafety(projectDir);
     }
 
     switch (appType) {
         case 'static':
-            runStaticChecks();
+            runStaticChecks(projectDir);
             return;
 
         case 'php':
-            runPhpChecks();
+            runPhpChecks(projectDir);
             return;
 
         case 'django':
         case 'flask':
         case 'python':
-            runPythonChecks();
+            runPythonChecks(projectDir);
             return;
 
         case 'rails':
         case 'ruby':
-            runRailsChecks();
+            runRailsChecks(projectDir);
             return;
 
         case 'go':
-            runGoChecks();
+            runGoChecks(projectDir);
             return;
 
         case 'java':
-            runJavaChecks();
+            runJavaChecks(projectDir);
             return;
 
+        case 'vue':
+        case 'nuxt':
         default:
             // Node.js / JS frameworks
             break;
     }
 
     // Node/npm project
-    const pkgPath = `${process.cwd()}/package.json`;
+    const pkgPath = `${projectDir}/package.json`;
     if (!fs.existsSync(pkgPath)) {
         if (strictCI) {
             throw new AutoFlowError(
@@ -559,5 +561,5 @@ export async function runCIChecks(appType: string, strictCI?: boolean): Promise<
         return;
     }
 
-    await runNodeChecks(strictCI);
+    await runNodeChecks(projectDir, strictCI);
 }

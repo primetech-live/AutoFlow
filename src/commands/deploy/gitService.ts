@@ -2,8 +2,8 @@ import simpleGit from 'simple-git';
 import log from '../../utils/logger';
 import { AutoFlowError, EXIT_CODES } from './errors';
 
-export async function syncLocalGit(): Promise<string> {
-    const git = simpleGit();
+export async function syncLocalGit(projectDir: string = process.cwd()): Promise<string> {
+    const git = simpleGit(projectDir);
 
     log.info('Checking local git status...');
     try {

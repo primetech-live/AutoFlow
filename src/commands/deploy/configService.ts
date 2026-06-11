@@ -1,9 +1,9 @@
 import { loadGlobalConfig, loadProjectConfig, MergedConfig } from '../../utils/config';
 import log from '../../utils/logger';
 
-export function loadConfig(): MergedConfig {
+export function loadConfig(projectDir: string = process.cwd()): MergedConfig {
     const globalConfig = loadGlobalConfig();
-    const projectConfig = loadProjectConfig();
+    const projectConfig = loadProjectConfig(projectDir);
 
     // Project config takes precedence over global config
     const merged: MergedConfig = { ...globalConfig, ...projectConfig };

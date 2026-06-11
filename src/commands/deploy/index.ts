@@ -12,27 +12,76 @@ import { startContainer, verifyContainerHealth } from './containerService';
 import { backupContainer, confirmDeploy, triggerRollback } from './rollback';
 import { configureNginx } from './nginxService';
 import { provisionSSL } from './sslService';
+import { configureUFW } from './ufwService';
 import { syncEnv, unlockEnvOnServer, cleanupEnv } from './envService';
 import { loadVaultConfig } from '../../utils/vaultService';
+import { vaultEngine } from '../../core/vault';
+import { AutoFlowError, EXIT_CODES, unregisterCleanupHandlers } from './errors';
 import inquirer from 'inquirer';
+import fs from 'fs';
+import path from 'path';
 
-async function deploy(isDesktop: boolean = false): Promise<void> {
+import os from 'os';
+
+const LOCK_FILE = path.join(os.homedir(), '.autoflow', 'jobs', 'deploy.lock');
+
+async function deploy(isDesktop: boolean = false, projectDir: string = process.cwd()): Promise<void> {
+    if (fs.existsSync(LOCK_FILE)) {
+        throw new AutoFlowError('Another deployment is already in progress.', EXIT_CODES.CI_FAILED, 'deploy');
+    }
+    fs.mkdirSync(path.dirname(LOCK_FILE), { recursive: true });
+    fs.writeFileSync(LOCK_FILE, Date.now().toString());
+
     // Top-level catch — ensures NO raw stack traces ever reach the user
     try {
         // ── Step 1: Load config ──────────────────────────────────────────────
         log.header('AUTOFLOW DEPLOY');
-        const config = loadConfig();
+        const config = loadConfig(projectDir);
 
-        const projectDir = `/home/${config.sshUser}/apps/${config.projectName}`;
+        const remoteProjectDir = `/home/${config.sshUser}/apps/${config.projectName}`;
         const image = `${config.projectName}:latest`;
         const container = config.projectName;
         const containerPort = config.appType === 'static' ? 80 : 3000;
 
+        // ── Step 1.5: Vault Authentication (Early Unlock) ────────────────────
+        const vault = loadVaultConfig();
+        let pat: string | undefined;
+
+        if (vault) {
+            const needsUnlock = vault.projectTokens?.[config.projectName] || fs.existsSync(path.join(projectDir, '.env'));
+            if (needsUnlock && !vaultEngine.isUnlocked()) {
+                if (isDesktop) {
+                    throw new AutoFlowError('Vault is locked. Please unlock it in the desktop app first.', EXIT_CODES.CI_FAILED, 'vault');
+                }
+                log.header('Z+ SECURITY CHALLENGE');
+                const { password } = await inquirer.prompt([{
+                    type: 'password',
+                    name: 'password',
+                    message: 'Enter Master Deployment Password:',
+                    mask: '*'
+                }]);
+                const { token } = await inquirer.prompt([{
+                    type: 'input',
+                    name: 'token',
+                    message: 'Enter 6-digit OTP from your phone:',
+                }]);
+
+                if (!vaultEngine.unlock(password, token)) {
+                    throw new AutoFlowError('Invalid Vault credentials.', EXIT_CODES.CI_FAILED, 'vault');
+                }
+                log.success('✔ Z+ Identity Verified. Session Unlocked.');
+            }
+
+            if (vault.projectTokens?.[config.projectName] && vaultEngine.isUnlocked()) {
+                pat = vaultEngine.decrypt(vault.projectTokens[config.projectName]);
+            }
+        }
+
         // ── Step 2: Local CI Checks (pre-push) ────────────────────────────────
-        await runCIChecks(config.appType, config.strictCI);
+        await runCIChecks(projectDir, config.appType, config.strictCI);
 
         // ── Step 3: Git sync (local → remote repo) ───────────────────────────
-        const sha = await syncLocalGit();
+        const sha = await syncLocalGit(projectDir);
 
         // ── Step 4: Remote CI Checks (GitHub Actions) ───────────────────────
         await waitForRemoteCI(config.gitRepo, sha, config.strictCI);
@@ -48,34 +97,33 @@ async function deploy(isDesktop: boolean = false): Promise<void> {
             const hostPort = await allocatePort(ssh, container);
 
             // ── Step 7: Pull code on server ──────────────────────────────────
-            await pullCodeOnServer(ssh, projectDir, config.gitRepo);
+            await pullCodeOnServer(ssh, remoteProjectDir, config.gitRepo, config.branch, pat);
 
             // ── Step 8: Rollback — backup current container ──────────────────
             await backupContainer(ssh, container);
 
             // ── Step 9: Build Docker image ───────────────────────────────────
-            await buildDockerImage(ssh, projectDir, image);
+            await buildDockerImage(ssh, remoteProjectDir, image);
 
-            // ── Step 9.5: Environment Sync & Unlock (Z+ Security) ────────────
-            const vault = loadVaultConfig();
+            // ── Step 9.5: Environment Sync (Z+ Security) ────────────
             let envUnlocked = false;
 
             if (vault) {
-                // This will prompt for Password + OTP
-                const password = await syncEnv(ssh, projectDir);
-
+                const password = await syncEnv(ssh, remoteProjectDir, projectDir);
                 if (password) {
-                    await unlockEnvOnServer(ssh, projectDir, password, vault.salt);
+                    // Unlock is no longer needed on server directly since it's SFTP streamed,
+                    // but we keep it for backward compat or custom setup
+                    await unlockEnvOnServer(ssh, remoteProjectDir, password, vault.salt);
                     envUnlocked = true;
                 }
             }
 
             // ── Step 10: Start new container ─────────────────────────────────
-            await startContainer(ssh, projectDir, container, image, hostPort, containerPort, !!config.domain, envUnlocked, config.volumes);
+            await startContainer(ssh, remoteProjectDir, container, image, hostPort, containerPort, !!config.domain, envUnlocked, config.volumes);
 
             // ── Step 10.5: Cleanup ───────────────────────────────────────────
             if (envUnlocked) {
-                await cleanupEnv(ssh, projectDir);
+                await cleanupEnv(ssh, remoteProjectDir);
             }
 
             // ── Step 11: Health check → confirm or rollback ──────────────────
@@ -83,11 +131,25 @@ async function deploy(isDesktop: boolean = false): Promise<void> {
                 await verifyContainerHealth(ssh, container);
                 await confirmDeploy(ssh, container);
             } catch (healthErr) {
-                await triggerRollback(ssh, container);
+                log.warning('Health check failed. Attempting rollback...');
+                let rollbackSsh = ssh;
+                try {
+                    await ssh.execCommand('echo 1');
+                } catch {
+                    log.info('SSH connection lost. Reconnecting for rollback...');
+                    rollbackSsh = await connectSSH(config, isDesktop);
+                }
+                try {
+                    await triggerRollback(rollbackSsh, container);
+                } finally {
+                    if (rollbackSsh !== ssh) try { rollbackSsh.dispose(); } catch {}
+                }
                 throw healthErr;
             }
 
             // ── Step 12 & 13: Nginx + SSL (domain mode only) ─────────────────
+            await configureUFW(ssh, hostPort, !!config.domain, config.sshPort);
+
             if (config.domain) {
                 await configureNginx(ssh, config.domain, config.projectName, config.sshUser, hostPort);
                 await provisionSSL(ssh, config.domain);
@@ -100,7 +162,10 @@ async function deploy(isDesktop: boolean = false): Promise<void> {
         } finally {
             // SSH is ALWAYS cleaned up for CLI
             if (!isDesktop) {
-                try { ssh.dispose(); } catch {}
+                try {
+                    unregisterCleanupHandlers(ssh);
+                    ssh.dispose();
+                } catch {}
             }
         }
 
@@ -110,6 +175,8 @@ async function deploy(isDesktop: boolean = false): Promise<void> {
         }
         // Single unified error handler — formats every error cleanly, no stack traces
         handleFatalError(err);
+    } finally {
+        if (fs.existsSync(LOCK_FILE)) fs.unlinkSync(LOCK_FILE);
     }
 }
 

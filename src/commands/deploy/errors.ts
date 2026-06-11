@@ -82,21 +82,42 @@ export async function exec(
     return result;
 }
 
+class SshCleanupManager {
+    private connections = new Set<NodeSSH>();
+    private initialized = false;
+
+    public register(ssh: NodeSSH) {
+        this.connections.add(ssh);
+        if (!this.initialized) {
+            this.initialized = true;
+            const cleanup = (signal: string) => {
+                log.warning(`\\n⚡ Received ${signal}. Cleaning up SSH connections...`);
+                for (const conn of this.connections) {
+                    try { conn.dispose(); } catch (_) {}
+                }
+                log.warning('AutoFlow exited. Your server may be in a partial state. Run "autoflow status" to check.');
+                process.exit(EXIT_CODES.UNKNOWN);
+            };
+
+            process.once('SIGINT', () => cleanup('SIGINT (Ctrl+C)'));
+            process.once('SIGTERM', () => cleanup('SIGTERM'));
+        }
+    }
+
+    public unregister(ssh: NodeSSH) {
+        this.connections.delete(ssh);
+    }
+}
+
+const cleanupManager = new SshCleanupManager();
+
 // Registers process signal handlers — ensures SSH is always cleaned up
 export function registerCleanupHandlers(ssh: NodeSSH): void {
-    const cleanup = (signal: string) => {
-        log.warning(`\n⚡ Received ${signal}. Cleaning up SSH connection...`);
-        try {
-            ssh.dispose();
-        } catch (_) {
-            // ignore
-        }
-        log.warning('AutoFlow exited. Your server may be in a partial state. Run "autoflow status" to check.');
-        process.exit(EXIT_CODES.UNKNOWN);
-    };
+    cleanupManager.register(ssh);
+}
 
-    process.once('SIGINT', () => cleanup('SIGINT (Ctrl+C)'));
-    process.once('SIGTERM', () => cleanup('SIGTERM'));
+export function unregisterCleanupHandlers(ssh: NodeSSH): void {
+    cleanupManager.unregister(ssh);
 }
 
 // Handles and formats top-level errors uniformly

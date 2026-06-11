@@ -12,8 +12,8 @@ async function execSafe(ssh: NodeSSH, command: string): Promise<void> {
     }
 }
 
-async function stop(): Promise<void> {
-    const projectConfig = loadProjectConfig();
+async function stop(isDesktop: boolean = false, projectDir: string = process.cwd()): Promise<void> {
+    const projectConfig = loadProjectConfig(projectDir);
     const globalConfig = loadGlobalConfig();
     const config = { ...globalConfig, ...projectConfig };
 
@@ -31,7 +31,7 @@ async function stop(): Promise<void> {
         });
 
         const container = config.projectName;
-        const projectDir = `/home/${config.sshUser}/apps/${config.projectName}`;
+        const remoteProjectDir = `/home/${config.sshUser}/apps/${config.projectName}`;
 
         // 1. Stop & remove container
         log.info('Stopping container...');
@@ -56,8 +56,8 @@ async function stop(): Promise<void> {
         await execSafe(ssh, 'sudo nginx -s reload');
 
         // 5. Remove project files
-        log.info(`Removing project files at ${projectDir}...`);
-        await execSafe(ssh, `rm -rf ${projectDir}`);
+        log.info(`Removing project files at ${remoteProjectDir}...`);
+        await execSafe(ssh, `rm -rf ${remoteProjectDir}`);
 
         log.success('Service stopped and cleaned up ✅');
         log.info('To redeploy, run: autoflow deploy');

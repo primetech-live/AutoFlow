@@ -108,6 +108,16 @@ AutoFlow is designed with security in mind to protect your server and project cr
 
 ---
 
+## 🖥️ Desktop App Packaging
+
+AutoFlow includes an Electron desktop wrapper for graphical management of deployments.
+To build the desktop application for distribution:
+
+1. Run `npm run dist` to package binaries using `electron-builder`.
+2. **macOS Note (Notarization):** To prevent Gatekeeper warnings on macOS, you must digitally sign and notarize the `.dmg` and `.zip` files. Set up your Apple Developer certificates and configure `afterSign: "scripts/notarize.js"` in the `package.json` build config before shipping to users.
+
+---
+
 ## 💡 Troubleshooting
 
 - **Permissions Error (Linux/Mac):** Ensure your private SSH key has proper permissions: `chmod 600 ~/.ssh/id_rsa`.

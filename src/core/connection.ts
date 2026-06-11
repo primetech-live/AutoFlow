@@ -1,6 +1,9 @@
 import { NodeSSH } from 'node-ssh';
 import { GlobalConfig } from './config';
 import EventEmitter from 'events';
+import fs from 'fs';
+import { loadVaultConfig } from '../utils/vaultService';
+import { vaultEngine } from './vault';
 
 export type ConnectionState = 'Disconnected' | 'Connecting' | 'Connected' | 'Reconnecting';
 
@@ -71,16 +74,46 @@ class ConnectionManager extends EventEmitter {
         }
 
         this.ssh = new NodeSSH();
-        await this.ssh.connect({
+        let privateKeyPath = this.config.sshKeyPath.replace(/^"|"$/g, '');
+        if (privateKeyPath.startsWith('~')) {
+            const os = require('os');
+            privateKeyPath = privateKeyPath.replace('~', os.homedir());
+        }
+
+        const connectOptions: any = {
             host: this.config.serverIp,
             username: this.config.sshUser,
             port: Number(this.config.sshPort),
-            privateKeyPath: this.config.sshKeyPath.replace(/^"|"$/g, ''),
             readyTimeout: 15000,
-            // SSH-level keepalive so the server doesn't drop idle connections
             keepaliveInterval: 30000,
             keepaliveCountMax: 5,
-        });
+        };
+
+        let usePassword = false;
+        let sshPassword = '';
+        const vault = loadVaultConfig();
+
+        if (!fs.existsSync(privateKeyPath)) {
+            usePassword = true;
+        } else {
+            connectOptions.privateKeyPath = privateKeyPath;
+        }
+
+        try {
+            if (usePassword) throw new Error('Key not found');
+            await this.ssh.connect(connectOptions);
+        } catch (initialErr) {
+            console.warn('[ConnectionManager] SSH Key auth failed or key missing. Falling back to password authentication.');
+            
+            if (vault && vault.sshPassword && vaultEngine.isUnlocked()) {
+                sshPassword = vaultEngine.decrypt(vault.sshPassword);
+                delete connectOptions.privateKeyPath;
+                connectOptions.password = sshPassword;
+                await this.ssh.connect(connectOptions);
+            } else {
+                throw new Error('SSH Key failed and Vault is locked or missing password. Cannot authenticate.');
+            }
+        }
 
         // Wire up disconnect handlers
         this.ssh.connection?.on('error', (err: any) => {

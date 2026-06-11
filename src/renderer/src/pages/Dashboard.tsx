@@ -206,6 +206,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         <option value="node">Node.js</option>
                         <option value="static">Static Web</option>
                         <option value="docker">Docker</option>
+                        <option value="vue">Vue.js</option>
+                        <option value="nuxt">Nuxt.js</option>
                     </select>
 
                     <select

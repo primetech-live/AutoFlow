@@ -19,6 +19,7 @@ import {
 } from '../core/config';
 
 import { vaultEngine } from '../core/vault';
+import { loadVaultConfig, saveVaultConfig } from '../utils/vaultService';
 import { projectScanner } from '../core/scanner';
 import { initProjectCore } from '../core/initializer';
 import { deployerEngine } from '../core/deployer';
@@ -26,6 +27,8 @@ import { monitorEngine } from '../core/monitor';
 import { connectionManager } from '../core/connection';
 import { installerEngine } from '../core/installer';
 import { addLogListener, removeLogListener, LogType } from '../utils/logger';
+import { installGlobalCli } from './cliInstaller';
+
 export function registerIpcHandlers(mainWindow: BrowserWindow) {
     // Window Controls
     ipcMain.on('window:minimize', () => {
@@ -119,6 +122,33 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
 
     ipcMain.handle('vault:is-unlocked', () => {
         return vaultEngine.isUnlocked();
+    });
+
+    ipcMain.handle('vault:save-git-pat', (_, projectName, pat) => {
+        if (!vaultEngine.isUnlocked()) return { success: false, error: 'Vault is locked' };
+        try {
+            const vault = loadVaultConfig();
+            if (!vault) return { success: false, error: 'Vault not initialized' };
+            if (!vault.projectTokens) vault.projectTokens = {};
+            vault.projectTokens[projectName] = vaultEngine.encrypt(pat);
+            saveVaultConfig(vault);
+            return { success: true };
+        } catch (e: any) {
+            return { success: false, error: e.message };
+        }
+    });
+
+    ipcMain.handle('vault:save-ssh-password', (_, password) => {
+        if (!vaultEngine.isUnlocked()) return { success: false, error: 'Vault is locked' };
+        try {
+            const vault = loadVaultConfig();
+            if (!vault) return { success: false, error: 'Vault not initialized' };
+            vault.sshPassword = vaultEngine.encrypt(password);
+            saveVaultConfig(vault);
+            return { success: true };
+        } catch (e: any) {
+            return { success: false, error: e.message };
+        }
     });
 
     // File Dialog Browser
@@ -254,6 +284,17 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
 
         try {
             await initProjectCore(projectPath, options);
+            
+            // Save PAT if provided and vault is unlocked
+            if (options.gitPat && vaultEngine.isUnlocked()) {
+                const vault = loadVaultConfig();
+                if (vault) {
+                    if (!vault.projectTokens) vault.projectTokens = {};
+                    vault.projectTokens[options.projectName] = vaultEngine.encrypt(options.gitPat);
+                    saveVaultConfig(vault);
+                }
+            }
+
             mainWindow.webContents.send('init:success', { projectName: options.projectName });
             return { success: true };
         } catch (error: any) {
@@ -284,11 +325,8 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
         };
         addLogListener(logListener);
 
-        const originalCwd = process.cwd();
         try {
-            process.chdir(projectPath);
-            await deployProjectCore(true); // isDesktop = true (keeps SSH alive, throws on error)
-            process.chdir(originalCwd);
+            await deployProjectCore(true, projectPath); // isDesktop = true, projectDir = projectPath
             removeLogListener(logListener);
 
             // Save history
@@ -306,7 +344,6 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
 
             if (!mainWindow.isDestroyed()) mainWindow.webContents.send('deploy:success', {});
         } catch (err: any) {
-            process.chdir(originalCwd);
             removeLogListener(logListener);
 
             deployerEngine.saveHistoryItem(projectName, {
@@ -468,5 +505,14 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
 
     connectionManager.on('state-changed', (state) => {
         if (!mainWindow.isDestroyed()) mainWindow.webContents.send('connection:state-changed', state);
+    });
+
+    // CLI Integration
+    ipcMain.handle('install-cli', () => {
+        try {
+            return { success: true, message: installGlobalCli() };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
     });
 }

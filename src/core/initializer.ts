@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { saveProjectConfig } from './config';
 import log from '../utils/logger';
+import { execSync } from 'child_process';
 
 export interface InitOptions {
     projectName: string;
@@ -14,7 +15,18 @@ export interface InitOptions {
 export async function initProjectCore(projectPath: string, options: InitOptions): Promise<void> {
     const { projectName, gitRepo, domain, strictCI, useVolumes } = options;
 
+    if (!/^[a-z0-9-]+$/i.test(projectName)) {
+        throw new Error('Project name can only contain alphanumeric characters and dashes.');
+    }
+
     log.header('AUTOFLOW INITIALIZATION');
+
+    try {
+        execSync(`git ls-remote ${gitRepo}`, { stdio: 'ignore' });
+    } catch (e) {
+        log.warning('Private repository detected (authentication required).');
+        log.warning('Please configure a Git Token in the Vault Settings before deploying.');
+    }
 
     /* ── Smart Detection Engine ─────────────────────────────────────── */
     let appType = 'node';
@@ -78,6 +90,10 @@ export async function initProjectCore(projectPath: string, options: InitOptions)
             appType = 'react'; buildCommand = `${runCmd} build`; startCommand = 'npx -y serve -s build -l tcp://0.0.0.0:3000';
         } else if (deps['@angular/cli']) {
             appType = 'angular'; buildCommand = `${runCmd} build`; startCommand = 'npx -y serve -s dist/browser -l 3000';
+        } else if (deps.nuxt) {
+            appType = 'nuxt'; buildCommand = `${runCmd} build`; startCommand = 'node .output/server/index.mjs';
+        } else if (deps.vue) {
+            appType = 'vue'; buildCommand = `${runCmd} build`; startCommand = 'npx -y serve -s dist -l tcp://0.0.0.0:3000';
         } else {
             appType = 'node';
             if (scripts.build) { buildCommand = `${runCmd} build`; }
@@ -187,7 +203,7 @@ export async function initProjectCore(projectPath: string, options: InitOptions)
     /* ── .dockerignore ───────────────────────────────────────────────── */
     if (!fs.existsSync(p('.dockerignore'))) {
         const baseIgnore = `.git\n.env\nautoflow.config.json${dockerignoreExtras}`;
-        const nodeIgnore = ['node', 'next', 'vite', 'react', 'angular'].includes(appType)
+        const nodeIgnore = ['node', 'next', 'nuxt', 'vue', 'vite', 'react', 'angular'].includes(appType)
             ? '\nnode_modules\ndist\nbuild'
             : '';
         fs.writeFileSync(p('.dockerignore'), baseIgnore + nodeIgnore);

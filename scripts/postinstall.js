@@ -63,6 +63,19 @@ function addToWindowsPath(dir) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
+const fs = require('fs');
+
+// Patch qrcode-terminal to fix Vite strict mode bundling issues
+const qrcodePath = path.join(__dirname, '..', 'node_modules', 'qrcode-terminal', 'lib', 'main.js');
+if (fs.existsSync(qrcodePath)) {
+    let content = fs.readFileSync(qrcodePath, 'utf8');
+    if (content.includes('\\033')) {
+        content = content.replace(/\\033/g, '\\x1B');
+        fs.writeFileSync(qrcodePath, content);
+        console.log('\\x1b[32m✔\\x1b[0m AutoFlow: Patched qrcode-terminal for Vite strict mode compatibility.');
+    }
+}
+
 if (os.platform() === 'win32') {
     const npmBin = getNpmGlobalBin();
     if (npmBin) {

@@ -1,6 +1,7 @@
 import { NodeSSH } from 'node-ssh';
 import chalk from 'chalk';
 import log from '../../utils/logger';
+import { escapeShellArg } from '../../utils/shell';
 
 export async function provisionSSL(
     ssh: NodeSSH,
@@ -17,6 +18,16 @@ export async function provisionSSL(
         return;
     }
 
+    const safeDomain = escapeShellArg(domain);
+
+    // DNS pre-validation
+    log.info(`Verifying DNS resolution for ${domain}...`);
+    const dnsCheck = await ssh.execCommand(`ping -c 1 ${safeDomain}`);
+    if (dnsCheck.code !== 0) {
+        log.warning(`⚠️  DNS resolution failed for ${domain}. Skipping SSL setup to prevent Let's Encrypt rate limits.`);
+        return;
+    }
+
     const certPath = `/etc/letsencrypt/live/${domain}/fullchain.pem`;
 
     // Pre-check: does cert already exist?
@@ -28,10 +39,11 @@ export async function provisionSSL(
     }
 
     const rootDomain = domain.split('.').slice(-2).join('.');
+    const safeRootDomain = escapeShellArg(`admin@${rootDomain}`);
     const certResult = await ssh.execCommand(`
-sudo certbot --nginx -d ${domain} \\
+sudo certbot --nginx -d ${safeDomain} \\
   --non-interactive --agree-tos --redirect \\
-  -m admin@${rootDomain}
+  -m ${safeRootDomain}
 `, { execOptions: { pty: false } } as object);
 
     if (certResult.code !== 0) {
