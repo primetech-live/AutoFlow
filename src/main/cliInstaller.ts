@@ -29,11 +29,11 @@ export function installGlobalCli(): string {
         fs.writeFileSync(cmdWrapperPath, cmdContent, 'utf-8');
 
         // Append to User PATH via PowerShell (safe, no admin required)
-        const checkPathCmd = `[Environment]::GetEnvironmentVariable("Path", "User")`;
+        const checkPathCmd = `[Environment]::GetEnvironmentVariable('Path', 'User')`;
         const currentPath = execSync(`powershell -NoProfile -Command "${checkPathCmd}"`).toString();
         
         if (!currentPath.includes(targetDir)) {
-            const addPathCmd = `[Environment]::SetEnvironmentVariable("Path", [Environment]::GetEnvironmentVariable("Path", "User") + ";${targetDir}", "User")`;
+            const addPathCmd = `[Environment]::SetEnvironmentVariable('Path', [Environment]::GetEnvironmentVariable('Path', 'User') + ';${targetDir}', 'User')`;
             execSync(`powershell -NoProfile -Command "${addPathCmd}"`);
         }
 
