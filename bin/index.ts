@@ -11,16 +11,29 @@ import setup from '../src/commands/setup';
 
 const program = new Command();
 
-const BANNER = String.raw`
-    ___         __        ________               
-   /   | __  __/ /_____  / ____/ /___ _      __
-  / /| |/ / / / __/ __ \/ /_  / / __ \ | /| / /
- / ___ / /_/ / /_/ /_/ / __/ / / /_/ / |/ |/ / 
-/_/  |_\__,_/\__/\____/_/   /_/\____/|__/|__/  
-`;
+const bannerLines = [
+    " █████╗ ██╗   ██╗████████╗██████╗ ███████╗██╗      ██████╗ ██╗    ██╗",
+    "██╔══██╗██║   ██║╚══██╔══╝██╔══██╗██╔════╝██║     ██╔═══██╗██║    ██║",
+    "███████║██║   ██║   ██║   ██║  ██║█████╗  ██║     ██║   ██║██║ █╗ ██║",
+    "██╔══██║██║   ██║   ██║   ██║  ██║██╔══╝  ██║     ██║   ██║██║███╗██║",
+    "██║  ██║╚██████╔╝   ██║   ██████╔╝██║     ███████╗╚██████╔╝╚███╔███╔╝",
+    "╚═╝  ╚═╝ ╚═════╝    ╚═╝   ╚═════╝ ╚═╝     ╚══════╝ ╚═════╝  ╚══╝╚══╝"
+];
 
-// Banner
-console.log(chalk.cyan(BANNER));
+// Beautiful cyan-to-blue gradient
+const colors = ['#7dd3fc', '#38bdf8', '#0ea5e9', '#0284c7', '#0369a1', '#075985'];
+
+console.log(''); // Spacing
+bannerLines.forEach((line, i) => {
+    console.log(chalk.hex(colors[i])(line));
+});
+
+console.log('');
+console.log(chalk.gray('  System: AutoFlow Core v1.0.1 | 0 dependencies'));
+console.log(chalk.cyan(' ╭─────────────────────────────────────────────────────────────────────────────╮'));
+console.log(chalk.cyan(' │') + '  > AutoFlow CLI now has ' + chalk.magenta('Standalone Bundling') + '📦, ' + chalk.green('OOM protection') + '🛡️, and more✨ ' + chalk.cyan('│'));
+console.log(chalk.cyan(' ╰─────────────────────────────────────────────────────────────────────────────╯'));
+console.log('');
 
 program
     .name('autoflow')
