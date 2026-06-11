@@ -13,8 +13,10 @@ import {
     ServerIcon,
     InfoIcon,
     SyncIcon,
-    SettingsIcon
+    SettingsIcon,
+    CopyIcon
 } from '../components/Icons';
+import { PasswordInput } from '../components/PasswordInput';
 
 interface ProjectDetailsProps {
     project: ScannedProject;
@@ -467,10 +469,8 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                         {gitRepo && (
                             <div className="form-group">
                                 <label className="form-label">Git Token (PAT - For Private Repos)</label>
-                                <input 
-                                    type="password"
+                                <PasswordInput 
                                     placeholder="Leave empty to keep existing token"
-                                    className="input"
                                     value={gitPat}
                                     onChange={(e) => setGitPat(e.target.value)}
                                 />
@@ -587,6 +587,19 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                                         >
                                             {item.masked ? <UnlockIcon size={10} /> : <LockIcon size={10} />}
                                             {item.masked ? 'Show' : 'Hide'}
+                                        </button>
+
+                                        <button 
+                                            type="button" 
+                                            onClick={() => {
+                                                navigator.clipboard.writeText(item.value);
+                                                setSuccessMsg('Secret copied to clipboard');
+                                                setTimeout(() => setSuccessMsg(''), 3000);
+                                            }}
+                                            className="btn btn-secondary"
+                                            style={{ padding: '4px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                        >
+                                            <CopyIcon size={10} /> Copy
                                         </button>
                                         
                                         <button 
@@ -803,7 +816,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                         )}
 
                         <div style={{
-                            background: 'var(--bg-main)',
+                            background: '#0B0B0D',
                             border: '1px solid var(--border-color)',
                             borderRadius: '6px',
                             padding: '16px',

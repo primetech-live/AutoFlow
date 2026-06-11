@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { CloseIcon, FolderIcon } from './Icons';
+import { PasswordInput } from './PasswordInput';
 
 interface InitOptions {
     projectName: string;
@@ -91,9 +92,7 @@ export const InitProjectModal: React.FC<InitProjectModalProps> = ({ projectPath,
                         {gitRepo && (
                             <div className="form-group">
                                 <label className="form-label">Git Personal Access Token (For Private Repos)</label>
-                                <input
-                                    type="password"
-                                    className="input"
+                                <PasswordInput
                                     placeholder="ghp_xxxxxxxxxxxx"
                                     value={gitPat}
                                     onChange={(e) => setGitPat(e.target.value)}

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { LockIcon, WarningIcon } from '../components/Icons';
 import appIcon from '../../assets/icon-1.png';
+import { PasswordInput } from '../components/PasswordInput';
 
 interface LockScreenProps {
     onUnlockSuccess: () => void;
@@ -91,11 +92,9 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlockSuccess, onReset
                 <form onSubmit={handleSubmit} style={{ width: '100%' }}>
                     <div className="form-group">
                         <label className="form-label">Master Password</label>
-                        <input
-                            type="password"
+                        <PasswordInput
                             required
                             placeholder="••••••••"
-                            className="input"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                         />

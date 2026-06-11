@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { SuccessIcon, WarningIcon, SyncIcon, TrashIcon, DownloadIcon } from '../components/Icons';
 import { DependencyInstaller } from '../components/DependencyInstaller';
+import { useTheme } from '../contexts/ThemeContext';
+import { PasswordInput } from '../components/PasswordInput';
 
 interface SettingsProps {
     onReRunOnboarding: () => void;
@@ -9,6 +11,8 @@ interface SettingsProps {
 }
 
 export const Settings: React.FC<SettingsProps> = ({ onReRunOnboarding, onResetConfig, showConfirm }) => {
+    const { theme, setTheme } = useTheme();
+
     // Config states
     const [serverIp, setServerIp] = useState('');
     const [sshUser, setSshUser] = useState('');
@@ -215,10 +219,8 @@ export const Settings: React.FC<SettingsProps> = ({ onReRunOnboarding, onResetCo
 
                         <div className="form-group" style={{ marginBottom: '12px' }}>
                             <label className="form-label">SSH Password Fallback (Optional, securely stored in Vault)</label>
-                            <input
-                                type="password"
+                            <PasswordInput
                                 placeholder="Leave empty to keep existing password"
-                                className="input"
                                 value={sshPassword}
                                 onChange={(e) => setSshPassword(e.target.value)}
                             />
@@ -239,6 +241,25 @@ export const Settings: React.FC<SettingsProps> = ({ onReRunOnboarding, onResetCo
 
                 {/* Right card: System Maintenance & Danger Zone */}
                 <div style={{ flex: 1, minWidth: '300px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    <div className="card">
+                        <h3 className="h2" style={{ fontSize: '15px', marginBottom: '12px' }}>
+                            Theme Preference
+                        </h3>
+                        <p className="text-secondary" style={{ fontSize: '12.5px', lineHeight: '1.5', marginBottom: '16px' }}>
+                            Select your UI theme. System syncs with your OS.
+                        </p>
+                        <select 
+                            className="input" 
+                            value={theme}
+                            onChange={(e) => setTheme(e.target.value as any)}
+                            style={{ width: '100%' }}
+                        >
+                            <option value="light">Light Theme</option>
+                            <option value="dark">Dark Theme</option>
+                            <option value="system">System (Auto sync)</option>
+                        </select>
+                    </div>
+
                     <div className="card">
                         <h3 className="h2" style={{ fontSize: '15px', marginBottom: '12px' }}>
                             Onboarding Assistant

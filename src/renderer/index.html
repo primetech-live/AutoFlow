@@ -4,6 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Autoflow vNext</title>
+    <script>
+        (function() {
+            try {
+                var stored = localStorage.getItem('autoflow-theme');
+                var theme = stored ? JSON.parse(stored) : 'system';
+                if (theme === 'system') {
+                    theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                }
+                document.documentElement.setAttribute('data-theme', theme);
+            } catch (e) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+        })();
+    </script>
 </head>
 <body>
     <div id="root"></div>

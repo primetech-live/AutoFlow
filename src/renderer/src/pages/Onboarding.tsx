@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { WarningIcon } from '../components/Icons';
 import { QRCodeSVG } from 'qrcode.react';
+import { useTheme } from '../contexts/ThemeContext';
+import { PasswordInput } from '../components/PasswordInput';
 
 interface OnboardingProps {
     onComplete: () => void;
 }
 
 export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
-    const [step, setStep] = useState(1);
+    const [step, setStep] = useState(0);
+    const { theme, setTheme } = useTheme();
     
     // Server state
     const [serverIp, setServerIp] = useState('');
@@ -134,7 +137,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                         borderRadius: '12px',
                         color: 'var(--accent)'
                     }}>
-                        STEP {step} OF 2
+                        STEP {step + 1} OF 3
                     </div>
                 </div>
 
@@ -155,7 +158,49 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                     </div>
                 )}
 
-                {step === 1 ? (
+                {step === 0 ? (
+                    <div>
+                        <h3 className="h2" style={{ fontSize: '15px', marginBottom: '16px' }}>0. Theme Preference</h3>
+                        <p className="text-secondary" style={{ fontSize: '13px', marginBottom: '24px' }}>
+                            Choose a theme for your AutoFlow dashboard. You can always change this later in Settings.
+                        </p>
+                        
+                        <div style={{ display: 'flex', gap: '16px', marginBottom: '32px' }}>
+                            {['light', 'dark', 'system'].map((t) => (
+                                <div 
+                                    key={t}
+                                    onClick={() => setTheme(t as 'light'|'dark'|'system')}
+                                    style={{
+                                        flex: 1,
+                                        height: '100px',
+                                        borderRadius: '8px',
+                                        border: `2px solid ${theme === t ? 'var(--accent)' : 'var(--border-color)'}`,
+                                        background: t === 'light' ? '#F7F9FC' : t === 'dark' ? '#0E0E10' : 'linear-gradient(135deg, #F7F9FC 50%, #0E0E10 50%)',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        flexDirection: 'column',
+                                        color: t === 'light' ? '#0F172A' : t === 'dark' ? '#F0F0F2' : 'var(--text-primary)',
+                                        boxShadow: theme === t ? '0 0 15px var(--accent-glow)' : 'none',
+                                        transition: 'all 0.2s'
+                                    }}
+                                >
+                                    <span style={{ fontWeight: 600, fontSize: '14px', textTransform: 'capitalize' }}>{t}</span>
+                                </div>
+                            ))}
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={() => setStep(1)}
+                            className="btn btn-primary"
+                            style={{ width: '100%', padding: '12px' }}
+                        >
+                            Next: Server Setup →
+                        </button>
+                    </div>
+                ) : step === 1 ? (
                     <form onSubmit={handleServerSubmit}>
                         <h3 className="h2" style={{ fontSize: '15px', marginBottom: '16px' }}>1. Remote VPS Server Credentials</h3>
                         
@@ -233,22 +278,18 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                         <div style={{ display: 'flex', gap: '16px' }}>
                             <div className="form-group" style={{ flex: 1 }}>
                                 <label className="form-label">Master Password</label>
-                                <input
-                                    type="password"
+                                <PasswordInput
                                     required
                                     placeholder="Minimum 8 chars"
-                                    className="input"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                 />
                             </div>
                             <div className="form-group" style={{ flex: 1 }}>
                                 <label className="form-label">Confirm Password</label>
-                                <input
-                                    type="password"
+                                <PasswordInput
                                     required
                                     placeholder="Confirm password"
-                                    className="input"
                                     value={confirmPassword}
                                     onChange={(e) => setConfirmPassword(e.target.value)}
                                 />
