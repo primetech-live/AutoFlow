@@ -29,10 +29,9 @@ bannerLines.forEach((line, i) => {
 });
 
 console.log('');
-console.log(chalk.gray('  System: AutoFlow Core v1.0.1 | 0 dependencies'));
-console.log(chalk.cyan(' ╭─────────────────────────────────────────────────────────────────────────────╮'));
-console.log(chalk.cyan(' │') + '  > AutoFlow CLI now has ' + chalk.magenta('Standalone Bundling') + '📦, ' + chalk.green('OOM protection') + '🛡️, and more✨ ' + chalk.cyan('│'));
-console.log(chalk.cyan(' ╰─────────────────────────────────────────────────────────────────────────────╯'));
+console.log(chalk.yellow(`   (\\_/)`));
+console.log(chalk.yellow(`   ( •_•)  `) + chalk.gray(`AutoFlow Core v1.0.1`));
+console.log(chalk.yellow(`   / >🚀   `) + chalk.magenta(`Ready to deploy your apps!`));
 console.log('');
 
 program
