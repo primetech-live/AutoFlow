@@ -28,11 +28,12 @@ bannerLines.forEach((line, i) => {
     console.log(chalk.hex(colors[i])(line));
 });
 
-console.log('');
-console.log(chalk.yellow(`   (\\_/)`));
-console.log(chalk.yellow(`   ( •_•)  `) + chalk.gray(`AutoFlow Core v1.0.1`));
-console.log(chalk.yellow(`   / >🚀   `) + chalk.magenta(`Ready to deploy your apps!`));
-console.log('');
+const printStaticMascot = () => {
+    console.log(chalk.yellow(`   (\\_/)`));
+    console.log(chalk.yellow(`   ( •_•)  `) + chalk.gray(`AutoFlow Core v1.0.1`));
+    console.log(chalk.yellow(`   / >🚀   `) + chalk.magenta(`Ready to deploy your apps!`));
+    console.log('');
+};
 
 program
     .name('autoflow')
@@ -64,9 +65,28 @@ program
     .description('Stop the running application on the server')
     .action(stop);
 
-program.parse(process.argv);
+const isBareCommand = !process.argv.slice(2).length;
 
-// Show help if no args given
-if (!process.argv.slice(2).length) {
-    program.outputHelp();
+if (isBareCommand) {
+    printStaticMascot();
+    
+    let frame = 0;
+    const frames = ["( •_•)", "( -_-)", "( ^_^)", "( •_•)"];
+    
+    const interval = setInterval(() => {
+        frame++;
+        if (frame >= frames.length) {
+            clearInterval(interval);
+            program.outputHelp();
+            return;
+        }
+        process.stdout.write('\x1B[4A'); // Move cursor up 4 lines
+        console.log(chalk.yellow(`   (\\_/)`));
+        console.log(chalk.yellow(`   ${frames[frame]}  `) + chalk.gray(`AutoFlow Core v1.0.1`));
+        console.log(chalk.yellow(`   / >🚀   `) + chalk.magenta(`Ready to deploy your apps!`));
+        console.log('');
+    }, 400);
+} else {
+    printStaticMascot();
+    program.parse(process.argv);
 }
