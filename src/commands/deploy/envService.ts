@@ -6,6 +6,7 @@ import { loadVaultConfig, encrypt, verifyOTP, hashPassword } from '../../utils/v
 import { AutoFlowError, EXIT_CODES, exec } from './errors';
 import inquirer from 'inquirer';
 import { vaultEngine } from '../../core/vault';
+import { escapeShellArg } from '../../utils/shell';
 
 /**
  * Handles the secure traversal of environment variables
@@ -67,6 +68,6 @@ export async function unlockEnvOnServer(ssh: NodeSSH, projectDir: string, passwo
  */
 export async function cleanupEnv(ssh: NodeSSH, projectDir: string): Promise<void> {
     log.info('Cleaning up temporary secrets...');
-    await ssh.execCommand(`rm -f ${projectDir}/.env`);
+    await ssh.execCommand(`rm -f ${escapeShellArg(projectDir + '/.env')}`);
     log.success('✔ Server-side disk is clean.');
 }

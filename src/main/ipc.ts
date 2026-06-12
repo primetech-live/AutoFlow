@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import speakeasy from 'speakeasy';
-import { execSync } from 'child_process';
+import { execSync, spawnSync } from 'child_process';
 
 import {
     globalConfigExists,
@@ -379,13 +379,13 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
         // Run git checkout & deployment in background so UI doesn't hang
         (async () => {
             try {
-                execSync(`git checkout ${commitSha}`, { cwd: projectPath });
+                spawnSync('git', ['checkout', commitSha], { cwd: projectPath, stdio: 'ignore' });
                 await deployerEngine.deploy(projectPath);
             } catch (err: any) {
                 console.error('[Rollback] Failed to deploy rollback commit:', err);
             } finally {
                 try {
-                    execSync(`git checkout ${originalBranch}`, { cwd: projectPath });
+                    spawnSync('git', ['checkout', originalBranch], { cwd: projectPath, stdio: 'ignore' });
                 } catch {}
             }
         })();

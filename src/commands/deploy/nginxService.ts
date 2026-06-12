@@ -32,7 +32,8 @@ server {
 }
 `;
 
-    const confPath = `/etc/nginx/sites-available/${projectName}`;
+    const safeProjectName = path.posix.basename(projectName);
+    const confPath = `/etc/nginx/sites-available/${safeProjectName}`;
 
     // ── Conflict resolution ──────────────────────────────────────────────────
     log.info('Scanning for conflicting Nginx configs...');
@@ -49,8 +50,8 @@ server {
 
             // Skip our own project or certbot-generated variants of it
             if (
-                conflictName === projectName ||
-                conflictName.startsWith(`${projectName}-`)
+                conflictName === safeProjectName ||
+                conflictName.startsWith(`${safeProjectName}-`)
             ) continue;
 
             // Read file and verify it's actually serving this exact domain
@@ -78,14 +79,15 @@ server {
         }
     }
 
-    // ── Write config + enable ────────────────────────────────────────────────
-    await exec(ssh, `echo '${nginxConf.replace(/'/g, `'\\'\'`)}' | sudo tee ${confPath} > /dev/null`);
-    await exec(ssh, `sudo ln -sf ${confPath} /etc/nginx/sites-enabled/${projectName}`);
+    await exec(ssh, `cat <<'NGINX_EOF' | sudo tee ${confPath} > /dev/null
+${nginxConf}
+NGINX_EOF`);
+    await exec(ssh, `sudo ln -sf ${confPath} /etc/nginx/sites-enabled/${safeProjectName}`);
 
     // Update port in case SSL config already exists
     await exec(
         ssh,
-        `sudo sed -i 's|proxy_pass http://127.0.0.1:[0-9]*;|proxy_pass http://127.0.0.1:${hostPort};|g' /etc/nginx/sites-enabled/${projectName}* 2>/dev/null || true`
+        `sudo sed -i 's|proxy_pass http://127.0.0.1:[0-9]*;|proxy_pass http://127.0.0.1:${hostPort};|g' /etc/nginx/sites-enabled/${safeProjectName}* 2>/dev/null || true`
     );
 
     // Test config

@@ -64,8 +64,8 @@ export function installGlobalCli(): string {
         else profileFile = path.join(os.homedir(), '.profile'); // Fallback
 
         const exportCmd = isFish 
-            ? `\\n# Autoflow CLI\\nset -gx PATH $HOME/.local/bin $PATH\\n` 
-            : `\\n# Autoflow CLI\\nexport PATH="$HOME/.local/bin:$PATH"\\n`;
+            ? `\n# Autoflow CLI\nset -gx PATH $HOME/.local/bin $PATH\n` 
+            : `\n# Autoflow CLI\nexport PATH="$HOME/.local/bin:$PATH"\n`;
 
         if (fs.existsSync(profileFile)) {
             const profileContent = fs.readFileSync(profileFile, 'utf-8');

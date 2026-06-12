@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { saveProjectConfig } from './config';
 import log from '../utils/logger';
-import { execSync } from 'child_process';
+import { execSync, spawnSync } from 'child_process';
 
 export interface InitOptions {
     projectName: string;
@@ -22,7 +22,7 @@ export async function initProjectCore(projectPath: string, options: InitOptions)
     log.header('AUTOFLOW INITIALIZATION');
 
     try {
-        execSync(`git ls-remote ${gitRepo}`, { stdio: 'ignore' });
+        spawnSync('git', ['ls-remote', gitRepo], { stdio: 'ignore' });
     } catch (e) {
         log.warning('Private repository detected (authentication required).');
         log.warning('Please configure a Git Token in the Vault Settings before deploying.');

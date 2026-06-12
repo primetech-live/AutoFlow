@@ -3,7 +3,7 @@ import fs from 'fs';
 import log from '../utils/logger';
 import { saveProjectConfig, loadGlobalConfig } from '../utils/config';
 import path from 'path';
-import { execSync } from 'child_process';
+import { execSync, spawnSync } from 'child_process';
 import { loadVaultConfig, saveVaultConfig } from '../utils/vaultService';
 import { vaultEngine } from '../core/vault';
 
@@ -48,7 +48,7 @@ async function init(): Promise<void> {
   ]);
 
   try {
-    execSync(`git ls-remote ${answers.gitRepo}`, { stdio: 'ignore' });
+    spawnSync('git', ['ls-remote', answers.gitRepo], { stdio: 'ignore' });
   } catch (e) {
     log.warning('\nPrivate repository detected (authentication required).');
     const { pat } = await inquirer.prompt<{ pat: string }>([{

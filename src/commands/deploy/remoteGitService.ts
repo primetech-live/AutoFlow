@@ -23,7 +23,7 @@ echo "$GIT_TOKEN"
 EOF
 chmod 700 askpass.sh
 export GIT_ASKPASS=$(pwd)/askpass.sh
-export GIT_TOKEN=${escapeShellArg(pat)}
+export GIT_TOKEN='${pat.replace(/'/g, "'\\''")}'
 `;
         authCleanup = `
 rm -f askpass.sh

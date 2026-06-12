@@ -75,9 +75,10 @@ export async function exec(
     const result = await execWithTimeout(ssh, command, timeoutMs, streamLogs);
     if (result.code !== 0) {
         const errorOutput = result.stderr || result.stdout;
-        log.error(`Command failed: ${command.trim().slice(0, 120)}`);
+        const sanitizedCommand = command.replace(/GIT_TOKEN='[^']+'/g, "GIT_TOKEN='********'");
+        log.error(`Command failed: ${sanitizedCommand.trim().slice(0, 120)}`);
         if (errorOutput) console.error(errorOutput);
-        throw new AutoFlowError(`Remote command failed`, EXIT_CODES.UNKNOWN, command);
+        throw new AutoFlowError(`Remote command failed`, EXIT_CODES.UNKNOWN, sanitizedCommand);
     }
     return result;
 }

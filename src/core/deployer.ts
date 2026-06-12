@@ -3,7 +3,6 @@ import path from 'path';
 import os from 'os';
 import { EventEmitter } from 'events';
 import { loadGlobalConfig, loadProjectConfig } from './config';
-import deployProjectCore from '../commands/deploy/index';
 import { initProjectCore } from './initializer';
 import { addLogListener, removeLogListener, LogType } from '../utils/logger';
 
@@ -125,7 +124,6 @@ export class DeployerEngine extends EventEmitter {
         let projectName = 'Unknown';
         const startTime = Date.now();
         const logs: Array<{ timestamp: number; type: LogType; message: string }> = [];
-        let logListener: ((type: LogType, message: string) => void) | null = null;
 
         try {
             const projectConfig = loadProjectConfig(projectPath);
@@ -236,7 +234,6 @@ export class DeployerEngine extends EventEmitter {
 
             this.emit('deploy:failed', { projectName, error: error.message });
         } finally {
-            if (logListener) removeLogListener(logListener);
             this.activeDeployments.delete(projectName);
             this.clearActiveJob();
         }

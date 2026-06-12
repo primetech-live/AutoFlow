@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ScannedProject } from './Dashboard';
 import { LoggerConsole, LogLine } from '../components/LoggerConsole';
 import {
@@ -62,6 +62,8 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
     const [remoteLogs, setRemoteLogs] = useState<string>('');
     const [logsLoading, setLogsLoading] = useState(false);
     const [logsError, setLogsError] = useState('');
+    const logsContainerRef = useRef<HTMLDivElement>(null);
+    const isScrolledToBottom = useRef(true);
 
     const fetchDiagnostics = async () => {
         setMonitorLoading(true);
@@ -105,17 +107,17 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
         }
     };
 
-    const fetchLiveLogs = async () => {
-        setLogsLoading(true);
-        setLogsError('');
+    const fetchLiveLogs = async (isBackground = false) => {
+        if (!isBackground) setLogsLoading(true);
+        if (!isBackground) setLogsError('');
         try {
             const containerName = project.containerRawName || project.projectName;
             const logs = await window.autoflow.fetchRemoteLogs(containerName);
             setRemoteLogs(logs);
         } catch (err: any) {
-            setLogsError(err.message || 'Failed to fetch container logs.');
+            if (!isBackground) setLogsError(err.message || 'Failed to fetch container logs.');
         } finally {
-            setLogsLoading(false);
+            if (!isBackground) setLogsLoading(false);
         }
     };
 
@@ -123,13 +125,24 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
         if (activeSubTab === 'monitor') {
             fetchDiagnostics();
         }
-    }, [activeSubTab, project]);
+    }, [activeSubTab, project.projectName]);
 
     useEffect(() => {
         if (activeSubTab === 'logs') {
             fetchLiveLogs();
+            const interval = setInterval(() => {
+                fetchLiveLogs(true);
+            }, 3000);
+            return () => clearInterval(interval);
         }
-    }, [activeSubTab, project]);
+    }, [activeSubTab, project.projectName, project.containerRawName]);
+
+    // Auto-scroll logs when new logs arrive
+    useEffect(() => {
+        if (logsContainerRef.current && isScrolledToBottom.current) {
+            logsContainerRef.current.scrollTop = logsContainerRef.current.scrollHeight;
+        }
+    }, [remoteLogs]);
 
     // Overview config states
     const [projectName, setProjectName] = useState(project.projectName);
@@ -643,14 +656,14 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                                         <iframe
                                             src={`http://${domain}`}
                                             title="Live Preview"
-                                            style={{
-                                                width: '250%',
-                                                height: '250%',
+                                        style={{
+                                                width: '275%',
+                                                height: '275%',
                                                 border: 'none',
                                                 position: 'absolute',
                                                 top: 0,
                                                 left: 0,
-                                                transform: 'scale(0.4)',
+                                                transform: 'scale(0.3636)',
                                                 transformOrigin: '0 0'
                                             }}
                                         />
@@ -937,7 +950,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                             </div>
                             <button
                                 type="button"
-                                onClick={fetchLiveLogs}
+                                onClick={() => fetchLiveLogs(false)}
                                 disabled={logsLoading}
                                 className="btn btn-secondary"
                                 style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '12px' }}
@@ -952,7 +965,13 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                             </div>
                         )}
 
-                        <div style={{
+                        <div 
+                            ref={logsContainerRef}
+                            onScroll={(e) => {
+                                const target = e.target as HTMLDivElement;
+                                isScrolledToBottom.current = Math.abs(target.scrollHeight - target.scrollTop - target.clientHeight) < 10;
+                            }}
+                            style={{
                             background: '#0B0B0D',
                             border: '1px solid var(--border-color)',
                             borderRadius: '6px',
@@ -967,7 +986,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                             whiteSpace: 'pre-wrap',
                             wordBreak: 'break-all'
                         }}>
-                            {logsLoading ? (
+                            {logsLoading && !remoteLogs ? (
                                 <div style={{ display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }}>
                                     Loading logs from SSH host...
                                 </div>

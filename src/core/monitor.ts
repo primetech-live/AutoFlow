@@ -183,14 +183,12 @@ export class MonitorEngine {
         }
 
         try {
-            this.sanitizeContainerName(name);
-            let cmd = `docker logs --tail 150 ${name}`;
+            const clean = this.sanitizeContainerName(name);
+            let cmd = `docker logs --tail 150 ${clean}`;
             if (name.startsWith('[pm2] ')) {
-                const pm2Name = name.replace('[pm2] ', '');
-                cmd = `pm2 logs "${pm2Name}" --raw --lines 150`;
+                cmd = `pm2 logs "${clean}" --raw --lines 150`;
             } else if (name.startsWith('[systemd] ')) {
-                const systemdName = name.replace('[systemd] ', '');
-                cmd = `journalctl -u "${systemdName}" -n 150 --no-pager`;
+                cmd = `journalctl -u "${clean}" -n 150 --no-pager`;
             }
 
             const result = await connectionManager.execCommand(cmd);
@@ -211,41 +209,41 @@ export class MonitorEngine {
         if (!/^[a-zA-Z0-9_.-]+$/.test(clean)) {
             throw new Error(`Invalid container name: ${clean}`);
         }
-        return name;
+        return clean;
     }
 
     // --- Container Controls ---
     public async stopContainer(name: string): Promise<boolean> {
-        this.sanitizeContainerName(name);
+        const clean = this.sanitizeContainerName(name);
         let success = false;
-        if (name.startsWith('[pm2] ')) success = (await connectionManager.safeRun(`pm2 stop "${name.replace('[pm2] ', '')}"`)) !== null;
-        else if (name.startsWith('[systemd] ')) success = (await connectionManager.safeRun(`sudo systemctl stop "${name.replace('[systemd] ', '')}"`)) !== null;
-        else success = (await connectionManager.safeRun(`docker stop ${name}`)) !== null;
+        if (name.startsWith('[pm2] ')) success = (await connectionManager.safeRun(`pm2 stop "${clean}"`)) !== null;
+        else if (name.startsWith('[systemd] ')) success = (await connectionManager.safeRun(`sudo systemctl stop "${clean}"`)) !== null;
+        else success = (await connectionManager.safeRun(`docker stop ${clean}`)) !== null;
         
         // Only log Docker container actions to history to avoid dashboard glitches
-        if (success && !name.startsWith('[')) deployerEngine.logContainerAction(this.cleanName(name), 'Stopped');
+        if (success && !name.startsWith('[')) deployerEngine.logContainerAction(clean, 'Stopped');
         return success;
     }
 
     public async restartContainer(name: string): Promise<boolean> {
-        this.sanitizeContainerName(name);
+        const clean = this.sanitizeContainerName(name);
         let success = false;
-        if (name.startsWith('[pm2] ')) success = (await connectionManager.safeRun(`pm2 restart "${name.replace('[pm2] ', '')}"`)) !== null;
-        else if (name.startsWith('[systemd] ')) success = (await connectionManager.safeRun(`sudo systemctl restart "${name.replace('[systemd] ', '')}"`)) !== null;
-        else success = (await connectionManager.safeRun(`docker restart ${name}`)) !== null;
+        if (name.startsWith('[pm2] ')) success = (await connectionManager.safeRun(`pm2 restart "${clean}"`)) !== null;
+        else if (name.startsWith('[systemd] ')) success = (await connectionManager.safeRun(`sudo systemctl restart "${clean}"`)) !== null;
+        else success = (await connectionManager.safeRun(`docker restart ${clean}`)) !== null;
 
-        if (success && !name.startsWith('[')) deployerEngine.logContainerAction(this.cleanName(name), 'Restarted');
+        if (success && !name.startsWith('[')) deployerEngine.logContainerAction(clean, 'Restarted');
         return success;
     }
 
     public async deleteContainer(name: string): Promise<boolean> {
-        this.sanitizeContainerName(name);
+        const clean = this.sanitizeContainerName(name);
         let success = false;
-        if (name.startsWith('[pm2] ')) success = (await connectionManager.safeRun(`pm2 delete "${name.replace('[pm2] ', '')}"`)) !== null;
+        if (name.startsWith('[pm2] ')) success = (await connectionManager.safeRun(`pm2 delete "${clean}"`)) !== null;
         else if (name.startsWith('[systemd] ')) success = false; // Not safe to delete systemd unit blindly
-        else success = (await connectionManager.safeRun(`docker rm -f ${name}`)) !== null;
+        else success = (await connectionManager.safeRun(`docker rm -f ${clean}`)) !== null;
 
-        if (success && !name.startsWith('[')) deployerEngine.logContainerAction(this.cleanName(name), 'Deleted');
+        if (success && !name.startsWith('[')) deployerEngine.logContainerAction(clean, 'Deleted');
         return success;
     }
 }

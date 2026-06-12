@@ -1,11 +1,12 @@
 import { NodeSSH } from 'node-ssh';
 import log from '../../utils/logger';
 import { AutoFlowError, EXIT_CODES } from './errors';
+import { escapeShellArg } from '../../utils/shell';
 
 export async function allocatePort(ssh: NodeSSH, containerName: string): Promise<string> {
     // 1. Try to reuse existing port if container is already running
     const currentMapping = await ssh.execCommand(
-        `docker ps --filter "name=${containerName}" --format "{{.Ports}}"`
+        `docker ps --filter ${escapeShellArg(`name=${containerName}`)} --format "{{.Ports}}"`
     );
 
     if (currentMapping.stdout) {

@@ -1,5 +1,7 @@
 import { app, BrowserWindow, dialog, shell } from 'electron';
 import path from 'path';
+import fs from 'fs';
+import os from 'os';
 import { registerIpcHandlers } from './ipc';
 import { deployerEngine } from '../core/deployer';
 import { connectionManager } from '../core/connection';
@@ -82,11 +84,18 @@ app.whenReady().then(async () => {
         }
     });
 
-    // Auto-connect to server if onboarding is complete
+    // Auto-connect to server if onboarding is complete and key auth can be used directly
     if (globalConfigExists()) {
         try {
             const config = loadGlobalConfig();
-            await connectionManager.connect(config);
+            let privateKeyPath = config.sshKeyPath ? config.sshKeyPath.replace(/^"|"$/g, '') : '';
+            if (privateKeyPath.startsWith('~')) {
+                privateKeyPath = privateKeyPath.replace('~', os.homedir());
+            }
+            const usePassword = !privateKeyPath || !fs.existsSync(privateKeyPath);
+            if (!usePassword) {
+                await connectionManager.connect(config);
+            }
         } catch (err) {
             console.error('[Main] Auto-connect failed:', err);
         }

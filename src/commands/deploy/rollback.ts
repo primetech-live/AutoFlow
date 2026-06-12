@@ -1,6 +1,7 @@
 import { NodeSSH } from 'node-ssh';
 import log from '../../utils/logger';
 import { AutoFlowError, EXIT_CODES } from './errors';
+import { escapeShellArg } from '../../utils/shell';
 
 const ROLLBACK_SUFFIX = '_rollback';
 
@@ -8,7 +9,7 @@ export async function backupContainer(ssh: NodeSSH, containerName: string): Prom
     log.info(`Creating rollback snapshot of "${containerName}"...`);
 
     const checkRunning = await ssh.execCommand(
-        `docker ps --filter "name=^/${containerName}$" --format "{{.Names}}"`
+        `docker ps --filter ${escapeShellArg(`name=^/${containerName}$`)} --format "{{.Names}}"`
     );
 
     if (!checkRunning.stdout.trim()) {
@@ -19,11 +20,11 @@ export async function backupContainer(ssh: NodeSSH, containerName: string): Prom
     const rollbackName = `${containerName}${ROLLBACK_SUFFIX}`;
 
     // Remove any old rollback container first
-    await ssh.execCommand(`docker rm -f ${rollbackName} || true`);
+    await ssh.execCommand(`docker rm -f ${escapeShellArg(rollbackName)} || true`);
 
     // Rename current container to the rollback slot
-    await ssh.execCommand(`docker rename ${containerName} ${rollbackName}`);
-    await ssh.execCommand(`docker stop ${rollbackName} || true`);
+    await ssh.execCommand(`docker rename ${escapeShellArg(containerName)} ${escapeShellArg(rollbackName)}`);
+    await ssh.execCommand(`docker stop ${escapeShellArg(rollbackName)} || true`);
 
     log.success(`Rollback snapshot ready: "${rollbackName}" ✔`);
 }
@@ -34,7 +35,7 @@ export async function confirmDeploy(ssh: NodeSSH, containerName: string): Promis
     const rollbackName = `${containerName}${ROLLBACK_SUFFIX}`;
 
     // Remove the rollback container — deployment was successful
-    await ssh.execCommand(`docker rm -f ${rollbackName} || true`);
+    await ssh.execCommand(`docker rm -f ${escapeShellArg(rollbackName)} || true`);
     log.success('Rollback snapshot removed. Deployment confirmed ✔');
 }
 
@@ -45,7 +46,7 @@ export async function triggerRollback(ssh: NodeSSH, containerName: string): Prom
 
     // Check if we have a rollback to restore
     const hasRollback = await ssh.execCommand(
-        `docker ps -a --filter "name=^/${rollbackName}$" --format "{{.Names}}"`
+        `docker ps -a --filter ${escapeShellArg(`name=^/${rollbackName}$`)} --format "{{.Names}}"`
     );
 
     if (!hasRollback.stdout.trim()) {
@@ -57,16 +58,16 @@ export async function triggerRollback(ssh: NodeSSH, containerName: string): Prom
     }
 
     // Stop and remove new (broken) container
-    await ssh.execCommand(`docker rm -f ${containerName} || true`);
+    await ssh.execCommand(`docker rm -f ${escapeShellArg(containerName)} || true`);
 
     // Rename rollback to the original name and restart it
-    await ssh.execCommand(`docker rename ${rollbackName} ${containerName}`);
-    await ssh.execCommand(`docker start ${containerName}`);
+    await ssh.execCommand(`docker rename ${escapeShellArg(rollbackName)} ${escapeShellArg(containerName)}`);
+    await ssh.execCommand(`docker start ${escapeShellArg(containerName)}`);
 
     // Verify rollback container is running
     await new Promise((resolve) => setTimeout(resolve, 3000));
     const ps = await ssh.execCommand(
-        `docker ps --filter "name=^/${containerName}$" --format "{{.Status}}"`
+        `docker ps --filter ${escapeShellArg(`name=^/${containerName}$`)} --format "{{.Status}}"`
     );
 
     if (ps.stdout.includes('Up')) {

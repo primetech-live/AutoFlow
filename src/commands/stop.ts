@@ -2,6 +2,7 @@ import { NodeSSH } from 'node-ssh';
 import chalk from 'chalk';
 import log from '../utils/logger';
 import { loadGlobalConfig, loadProjectConfig } from '../utils/config';
+import { escapeShellArg } from '../utils/shell';
 
 async function execSafe(ssh: NodeSSH, command: string): Promise<void> {
     const result = await ssh.execCommand(command);
@@ -33,15 +34,19 @@ async function stop(isDesktop: boolean = false, projectDir: string = process.cwd
         const container = config.projectName;
         const remoteProjectDir = `/home/${config.sshUser}/apps/${config.projectName}`;
 
+        const safeContainer = escapeShellArg(container);
+        const safeProjectName = escapeShellArg(config.projectName);
+        const safeRemoteProjectDir = escapeShellArg(remoteProjectDir);
+
         // 1. Stop & remove container
         log.info('Stopping container...');
-        await execSafe(ssh, `docker stop ${container}`);
+        await execSafe(ssh, `docker stop ${safeContainer}`);
 
         log.info('Removing container...');
-        await execSafe(ssh, `docker rm ${container}`);
+        await execSafe(ssh, `docker rm ${safeContainer}`);
 
         // Also clean up the rollback snapshot if it exists
-        await execSafe(ssh, `docker rm -f ${container}_rollback || true`);
+        await execSafe(ssh, `docker rm -f ${safeContainer}_rollback || true`);
 
         // 2. Prune unused Docker resources
         log.info('Pruning unused Docker resources...');
@@ -49,7 +54,7 @@ async function stop(isDesktop: boolean = false, projectDir: string = process.cwd
 
         // 3. Remove Nginx config
         log.info('Disabling Nginx config...');
-        await execSafe(ssh, `sudo rm -f /etc/nginx/sites-enabled/${config.projectName}`);
+        await execSafe(ssh, `sudo rm -f /etc/nginx/sites-enabled/${safeProjectName}`);
 
         // 4. Reload Nginx
         log.info('Reloading Nginx...');
@@ -57,7 +62,7 @@ async function stop(isDesktop: boolean = false, projectDir: string = process.cwd
 
         // 5. Remove project files
         log.info(`Removing project files at ${remoteProjectDir}...`);
-        await execSafe(ssh, `rm -rf ${remoteProjectDir}`);
+        await execSafe(ssh, `rm -rf ${safeRemoteProjectDir}`);
 
         log.success('Service stopped and cleaned up ✅');
         log.info('To redeploy, run: autoflow deploy');
