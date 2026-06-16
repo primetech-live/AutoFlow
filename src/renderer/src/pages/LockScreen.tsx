@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { LockIcon, WarningIcon } from '../components/Icons';
 import appIcon from '../../assets/icon-1.png';
 import loginNaturalVisual from '../../assets/login_natural_visual.png';
+import primetechLogo from '../../assets/primetech_logo.png';
 import { PasswordInput } from '../components/PasswordInput';
 
 interface LockScreenProps {
@@ -70,7 +71,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlockSuccess, onReset
                     backgroundSize: 'cover',
                     display: 'flex',
                     flexDirection: 'column',
-                    justifyContent: 'flex-end',
+                    justifyContent: 'space-between',
                     padding: '60px',
                     boxSizing: 'border-box',
                     overflow: 'hidden'
@@ -86,12 +87,68 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlockSuccess, onReset
                         zIndex: 1
                     }} />
 
-                    {/* Typography Content */}
+                    {/* Top Section: Glassmorphism AutoFlow Logo Card */}
+                    <div style={{ 
+                        zIndex: 2, 
+                        display: 'flex', 
+                        justifyContent: 'center', 
+                        alignItems: 'center',
+                        height: '100%',
+                        marginBottom: '40px'
+                    }}>
+                        <div style={{
+                            background: 'rgba(255, 255, 255, 0.05)',
+                            backdropFilter: 'blur(20px)',
+                            WebkitBackdropFilter: 'blur(20px)',
+                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                            borderRadius: '24px',
+                            padding: '36px 44px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            width: '280px',
+                            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.35)',
+                            boxSizing: 'border-box'
+                        }}>
+                            <img 
+                                src={appIcon} 
+                                alt="AutoFlow Logo" 
+                                style={{ 
+                                    width: '76px', 
+                                    height: '76px', 
+                                    borderRadius: '16px', 
+                                    marginBottom: '16px', 
+                                    boxShadow: '0 8px 24px rgba(0,0,0,0.3)' 
+                                }} 
+                            />
+                            <h1 style={{ 
+                                fontSize: '26px', 
+                                fontWeight: 850, 
+                                margin: 0, 
+                                letterSpacing: '-0.02em', 
+                                color: '#ffffff' 
+                            }}>
+                                AutoFlow
+                            </h1>
+                            <span style={{ 
+                                fontSize: '11px', 
+                                color: 'rgba(255, 255, 255, 0.45)', 
+                                marginTop: '6px', 
+                                textTransform: 'uppercase', 
+                                letterSpacing: '0.08em',
+                                fontWeight: 600
+                            }}>
+                                vNext platform
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Bottom Section: Typography & Powered by PrimeTech */}
                     <div style={{ zIndex: 2, color: '#ffffff', maxWidth: '520px' }}>
                         <h1 style={{ 
-                            fontSize: '34px', 
+                            fontSize: '32px', 
                             fontWeight: 800, 
-                            marginBottom: '16px', 
+                            marginBottom: '14px', 
                             lineHeight: '1.25',
                             letterSpacing: '-0.02em',
                             background: 'linear-gradient(135deg, #ffffff 40%, #e2e8f0 100%)',
@@ -101,14 +158,35 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlockSuccess, onReset
                             Zero-Config VPS Deployments
                         </h1>
                         <p style={{ 
-                            fontSize: '15px', 
-                            color: 'rgba(255, 255, 255, 0.8)', 
-                            lineHeight: '1.6', 
+                            fontSize: '14.5px', 
+                            color: 'rgba(255, 255, 255, 0.75)', 
+                            lineHeight: '1.55', 
                             margin: 0,
                             fontWeight: 400
                         }}>
                             AutoFlow vNext orchestrates Git syncs, builds Docker containers, configures Nginx proxies, and secures HTTPS certifications automatically on your VPS.
                         </p>
+
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            marginTop: '28px',
+                            color: 'rgba(255, 255, 255, 0.5)',
+                            fontSize: '12px',
+                            fontWeight: 500
+                        }}>
+                            <span>Powered by</span>
+                            <img 
+                                src={primetechLogo} 
+                                alt="PrimeTech Logo" 
+                                style={{ 
+                                    height: '20px', 
+                                    filter: 'brightness(0) invert(1)', 
+                                    opacity: 0.7 
+                                }} 
+                            />
+                        </div>
                     </div>
                 </div>
             )}
