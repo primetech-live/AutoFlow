@@ -3,14 +3,18 @@ import { SuccessIcon, WarningIcon, SyncIcon, TrashIcon, DownloadIcon } from '../
 import { DependencyInstaller } from '../components/DependencyInstaller';
 import { useTheme } from '../contexts/ThemeContext';
 import { PasswordInput } from '../components/PasswordInput';
+import iziToast from 'izitoast';
+import 'izitoast/dist/css/iziToast.min.css';
+
 
 interface SettingsProps {
     onReRunOnboarding: () => void;
     onResetConfig: () => void;
     showConfirm: (opts: { title: string; message: string; confirmLabel?: string; danger?: boolean; onConfirm: () => void }) => void;
+    onSaveSuccess?: () => void;
 }
 
-export const Settings: React.FC<SettingsProps> = ({ onReRunOnboarding, onResetConfig, showConfirm }) => {
+export const Settings: React.FC<SettingsProps> = ({ onReRunOnboarding, onResetConfig, showConfirm, onSaveSuccess }) => {
     const { theme, setTheme } = useTheme();
 
     // Config states
@@ -21,7 +25,9 @@ export const Settings: React.FC<SettingsProps> = ({ onReRunOnboarding, onResetCo
     const [sshPassword, setSshPassword] = useState('');
 
     const [loading, setLoading] = useState(false);
+    const [connecting, setConnecting] = useState(false);
     const [saveStatus, setSaveStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
     const [showDependencyInstaller, setShowDependencyInstaller] = useState(false);
 
     const [cliStatus, setCliStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -59,6 +65,7 @@ export const Settings: React.FC<SettingsProps> = ({ onReRunOnboarding, onResetCo
     const handleSaveConfig = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
+        setConnecting(false);
         setSaveStatus(null);
 
         if (!serverIp || !sshUser || !sshPort || !sshKeyPath) {
@@ -69,23 +76,75 @@ export const Settings: React.FC<SettingsProps> = ({ onReRunOnboarding, onResetCo
 
         try {
             await window.autoflow.saveGlobalConfig({
-                serverIp,
-                sshUser,
-                sshPort,
-                sshKeyPath
+                serverIp: serverIp.trim(),
+                sshUser: sshUser.trim(),
+                sshPort: sshPort.trim(),
+                sshKeyPath: sshKeyPath.trim()
             });
             if (sshPassword) {
-                await window.autoflow.invoke('vault:save-ssh-password', sshPassword);
+                await window.autoflow.invoke('vault:save-ssh-password', sshPassword.trim());
                 setSshPassword(''); // Clear for security
             }
             // Reconnect SSH with the new settings
             await window.autoflow.disconnectFromServer();
-            await window.autoflow.connectToServer();
-            setSaveStatus({ type: 'success', message: 'Server configuration saved. SSH reconnected.' });
+            
+            setConnecting(true);
+            const res = await window.autoflow.connectToServer();
+            if (res && !res.success) {
+                setSaveStatus({ type: 'error', message: `SSH connection failed: ${res.error || 'Unknown connection error'}` });
+            } else {
+                // Show standard iziToast success notification on connection success
+                iziToast.success({
+                    title: 'Connected',
+                    message: 'SSH connection established successfully!',
+                    position: 'bottomRight',
+                    theme: 'dark',
+                    backgroundColor: 'var(--bg-panel)',
+                    titleColor: 'var(--accent)',
+                    messageColor: 'var(--text-primary)',
+                    progressBarColor: 'var(--accent)',
+                    iconColor: 'var(--accent)'
+                });
+                
+                // Redirect immediately to dashboard on successful save & connection
+                onSaveSuccess?.();
+            }
         } catch (err: any) {
             setSaveStatus({ type: 'error', message: err.message || 'Failed to save configuration.' });
         } finally {
             setLoading(false);
+            setConnecting(false);
+        }
+    };
+
+    const handleReconnect = async () => {
+        setLoading(true);
+        setConnecting(true);
+        setSaveStatus(null);
+        try {
+            await window.autoflow.disconnectFromServer();
+            const res = await window.autoflow.connectToServer();
+            if (res && !res.success) {
+                setSaveStatus({ type: 'error', message: `Reconnection failed: ${res.error || 'Unknown connection error'}` });
+            } else {
+                iziToast.success({
+                    title: 'Connected',
+                    message: 'Reconnected successfully!',
+                    position: 'bottomRight',
+                    theme: 'dark',
+                    backgroundColor: 'var(--bg-panel)',
+                    titleColor: 'var(--accent)',
+                    messageColor: 'var(--text-primary)',
+                    progressBarColor: 'var(--accent)',
+                    iconColor: 'var(--accent)'
+                });
+                onSaveSuccess?.();
+            }
+        } catch (err: any) {
+            setSaveStatus({ type: 'error', message: err.message || 'Failed to reconnect.' });
+        } finally {
+            setLoading(false);
+            setConnecting(false);
         }
     };
 
@@ -226,14 +285,23 @@ export const Settings: React.FC<SettingsProps> = ({ onReRunOnboarding, onResetCo
                             />
                         </div>
 
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
+                            <button
+                                type="button"
+                                onClick={handleReconnect}
+                                disabled={loading || connecting}
+                                className="btn btn-secondary"
+                                style={{ padding: '10px 24px' }}
+                            >
+                                {connecting ? 'Reconnecting...' : 'Reconnect'}
+                            </button>
                             <button
                                 type="submit"
-                                disabled={loading}
+                                disabled={loading || connecting}
                                 className="btn btn-primary"
                                 style={{ padding: '10px 24px' }}
                             >
-                                {loading ? 'Saving...' : 'Save Configuration'}
+                                {connecting ? 'Connecting to Server...' : (loading ? 'Saving Config...' : 'Save Configuration')}
                             </button>
                         </div>
                     </form>

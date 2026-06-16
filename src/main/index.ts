@@ -30,6 +30,18 @@ function createWindow() {
     // Register IPC channels
     registerIpcHandlers(mainWindow);
 
+    // Prevent manual reloads in production to maintain session sync
+    if (!isDev) {
+        mainWindow.webContents.on('before-input-event', (event, input) => {
+            const isControlOrMeta = input.control || input.meta;
+            const isR = input.key.toLowerCase() === 'r';
+            const isF5 = input.key === 'F5';
+            if ((isControlOrMeta && isR) || isF5) {
+                event.preventDefault();
+            }
+        });
+    }
+
     if (isDev) {
         mainWindow.loadURL('http://localhost:5173');
         // Open DevTools in dev mode

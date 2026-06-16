@@ -83,6 +83,9 @@ export interface AutoflowApi {
 
     // CLI Integration
     installCli: () => Promise<{ success: boolean; message?: string; error?: string }>;
+
+    // Generic IPC Invoke
+    invoke: (channel: string, ...args: any[]) => Promise<any>;
 }
 
 const api: AutoflowApi = {
@@ -197,7 +200,10 @@ const api: AutoflowApi = {
     },
 
     // CLI Integration
-    installCli: () => ipcRenderer.invoke('install-cli')
+    installCli: () => ipcRenderer.invoke('install-cli'),
+
+    // Generic IPC Invoke
+    invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args)
 };
 
 contextBridge.exposeInMainWorld('autoflow', api);

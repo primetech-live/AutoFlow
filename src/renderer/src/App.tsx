@@ -126,6 +126,12 @@ const App: React.FC = () => {
                             } else {
                                 newStatus = 'Live';
                             }
+                            // Auto-verify and prune duplicates from other server IPs in background
+                            if (p.migrated) {
+                                window.autoflow.addProject(p.projectPath).then(() => {
+                                    loadProjects();
+                                });
+                            }
                         }
                         return {
                             ...p,
@@ -175,6 +181,11 @@ const App: React.FC = () => {
             }));
     }, [vpsContainers, projects]);
 
+    // Filter out migrated projects that are idle/unverified in the current server scope to prevent cross-server UI pollution
+    const displayProjects = useMemo(() => {
+        return projects.filter(p => !(p.migrated && p.status === 'Idle'));
+    }, [projects]);
+
     // Initialize state on mount
     useEffect(() => {
         checkState();
@@ -190,11 +201,21 @@ const App: React.FC = () => {
         // Listen for connection state changes
         window.autoflow.getConnectionState().then((state: string) => {
             setConnectionState(state);
-            if (state === 'Connected') fetchGlobalStats(false);
+            if (state === 'Connected') {
+                fetchGlobalStats(false);
+            } else {
+                setServerStats(null);
+                setVpsContainers([]);
+            }
         });
         window.autoflow.onConnectionStateChanged((state: string) => {
             setConnectionState(state);
-            if (state === 'Connected') fetchGlobalStats(false);
+            if (state === 'Connected') {
+                fetchGlobalStats(false);
+            } else {
+                setServerStats(null);
+                setVpsContainers([]);
+            }
         });
 
         // Listen to global background scanner
@@ -506,8 +527,8 @@ const App: React.FC = () => {
                     </div>
 
                     <div className="sidebar-projects-list">
-                        <div className="nav-section-title">CONNECTED PROJECTS ({projects.length})</div>
-                        {projects.map((proj) => {
+                        <div className="nav-section-title">CONNECTED PROJECTS ({displayProjects.length})</div>
+                        {displayProjects.map((proj) => {
                             const isSelected = selectedProject?.projectPath === proj.projectPath && !selectedProject?.isExternal;
                             const isDeploying = activeDeploy && activeDeploy.projectName === proj.projectName && activeDeploy.status === 'running';
 
@@ -601,7 +622,7 @@ const App: React.FC = () => {
                 <div className="main-content">
                     {activePage === 'dashboard' && (
                         <Dashboard
-                            projects={projects}
+                            projects={displayProjects}
                             externalProjects={liveOnlyProjects}
                             onSelectProject={handleSelectProject}
                             onImportProject={handleImportProject}
@@ -610,6 +631,7 @@ const App: React.FC = () => {
                             onResumeProject={handleResumeProject}
                             showConfirm={showConfirm}
                             activeDeploy={activeDeploy}
+                            isLoading={connectionState === 'Connecting' || connectionState === 'Reconnecting' || statsLoading}
                         />
                     )}
 
@@ -629,6 +651,7 @@ const App: React.FC = () => {
                             onReRunOnboarding={handleReRunOnboarding}
                             onResetConfig={handleResetAll}
                             showConfirm={showConfirm}
+                            onSaveSuccess={() => setActivePage('dashboard')}
                         />
                     )}
 

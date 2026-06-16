@@ -593,10 +593,18 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                                     >
                                         <option value="node">Node.js App (Next.js, Express)</option>
                                         <option value="static">Static Frontend (HTML, React Build)</option>
-                                        <option value="python">Python API (Flask, FastAPI)</option>
+                                        <option value="python">Python API (FastAPI)</option>
+                                        <option value="django">Python Django</option>
+                                        <option value="flask">Python Flask</option>
                                         <option value="go">Go Executable</option>
+                                        <option value="java">Java / Spring Boot</option>
+                                        <option value="rails">Ruby on Rails</option>
+                                        <option value="ruby">Ruby App</option>
+                                        <option value="php">PHP App (Pure PHP, Laravel)</option>
                                         <option value="vue">Vue.js</option>
                                         <option value="nuxt">Nuxt.js</option>
+                                        <option value="react">React.js</option>
+                                        <option value="angular">Angular</option>
                                     </select>
                                 </div>
 

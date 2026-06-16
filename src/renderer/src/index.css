@@ -480,3 +480,25 @@ body {
     justify-content: flex-end;
     gap: 12px;
 }
+
+/* Skeleton Loading Shimmer Animation */
+@keyframes skeleton-shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+.skeleton-shimmer {
+    background: linear-gradient(90deg, var(--bg-panel) 25%, var(--bg-card-hover) 50%, var(--bg-panel) 75%);
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.5s infinite linear;
+}
+
+[data-theme="dark"] .skeleton-shimmer {
+    background: linear-gradient(90deg, var(--bg-panel) 25%, #25252b 50%, var(--bg-panel) 75%);
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.5s infinite linear;
+}

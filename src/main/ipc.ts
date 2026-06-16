@@ -15,7 +15,8 @@ import {
     removeProjectFromSaved,
     loadProjectConfig,
     saveProjectConfig,
-    projectConfigExists
+    projectConfigExists,
+    loadSavedProjectsWithMetadata
 } from '../core/config';
 
 import { vaultEngine } from '../core/vault';
@@ -205,43 +206,59 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
 
     // Project Config and Saved list
     ipcMain.handle('projects:get-saved', async () => {
-        const paths = loadSavedProjects();
+        let serverIp = 'unknown';
+        try {
+            const globalConfig = loadGlobalConfig();
+            serverIp = globalConfig.serverIp || 'unknown';
+        } catch {}
+
+        const allProjects = loadSavedProjectsWithMetadata();
+        const activeProjects = allProjects.filter((p: any) => p.serverIp === serverIp);
         const projectsMetadata = [];
 
-        for (const p of paths) {
-            if (fs.existsSync(p)) {
-                try {
-                    const hasConfig = projectConfigExists(p);
-                    let projectName = path.basename(p);
-                    let appType = 'node';
-                    let gitRepo = '';
+        for (const p of activeProjects) {
+            const localExists = fs.existsSync(p.path);
+            try {
+                let hasConfig = false;
+                let projectName = path.basename(p.path);
+                let appType = 'node';
+                let gitRepo = '';
 
+                if (localExists) {
+                    hasConfig = projectConfigExists(p.path);
                     if (hasConfig) {
-                        const config = loadProjectConfig(p);
+                        const config = loadProjectConfig(p.path);
                         projectName = config.projectName || projectName;
                         appType = config.appType || appType;
                         gitRepo = config.gitRepo || '';
                     } else {
-                        const pkgPath = path.join(p, 'package.json');
+                        const pkgPath = path.join(p.path, 'package.json');
                         if (fs.existsSync(pkgPath)) {
                             const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
                             projectName = pkg.name || projectName;
                         }
                     }
-
-                    projectsMetadata.push({
-                        projectName,
-                        projectPath: p,
-                        hasConfig,
-                        appType,
-                        gitRepo
-                    });
-                } catch {
-                    // Ignore errors in reading configurations
                 }
-            } else {
-                // Auto prune invalid directory paths
-                removeProjectFromSaved(p);
+
+                projectsMetadata.push({
+                    projectName,
+                    projectPath: p.path,
+                    hasConfig,
+                    appType,
+                    gitRepo,
+                    localExists,
+                    migrated: p.migrated
+                });
+            } catch {
+                projectsMetadata.push({
+                    projectName: path.basename(p.path),
+                    projectPath: p.path,
+                    hasConfig: false,
+                    appType: 'node',
+                    gitRepo: '',
+                    localExists,
+                    migrated: p.migrated
+                });
             }
         }
         return projectsMetadata;

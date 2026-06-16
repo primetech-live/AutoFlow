@@ -31,6 +31,8 @@ export interface ScannedProject {
     status?: 'Live' | 'Failed' | 'Idle' | 'Deploying' | 'Stopped';
     isExternal?: boolean;
     containerRawName?: string;
+    localExists?: boolean;
+    migrated?: boolean;
 }
 
 interface DashboardProps {
@@ -43,6 +45,7 @@ interface DashboardProps {
     onResumeProject?: (containerName: string) => void;
     showConfirm: (opts: { title: string; message: string; confirmLabel?: string; danger?: boolean; onConfirm: () => void }) => void;
     activeDeploy: { projectName: string; status: string; step: string } | null;
+    isLoading?: boolean;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -54,7 +57,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
     onTriggerDeploy,
     onResumeProject,
     showConfirm,
-    activeDeploy
+    activeDeploy,
+    isLoading = false
 }) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [typeFilter, setTypeFilter] = useState('All');
@@ -209,7 +213,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         <option value="All">All Types</option>
                         <option value="node">Node.js</option>
                         <option value="static">Static Web</option>
-                        <option value="docker">Docker</option>
+                        <option value="python">Python</option>
+                        <option value="go">Go</option>
+                        <option value="php">PHP</option>
                         <option value="vue">Vue.js</option>
                         <option value="nuxt">Nuxt.js</option>
                     </select>
@@ -231,10 +237,30 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 {/* Connected Projects Section */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     <h2 className="h2" style={{ fontSize: '14px', letterSpacing: '0.05em', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
-                        Connected Projects ({filteredProjects.length})
+                        Connected Projects {isLoading ? '(Loading...)' : `(${filteredProjects.length})`}
                     </h2>
                     
-                    {filteredProjects.length === 0 ? (
+                    {isLoading ? (
+                        <div className="card-grid">
+                            {[1, 2, 3, 4].map((i) => (
+                                <div key={i} className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '210px' }}>
+                                    <div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                                            <div className="skeleton-shimmer" style={{ width: '60px', height: '16px', borderRadius: '4px' }} />
+                                            <div className="skeleton-shimmer" style={{ width: '80px', height: '16px', borderRadius: '4px' }} />
+                                        </div>
+                                        <div className="skeleton-shimmer" style={{ width: '70%', height: '20px', borderRadius: '4px', marginBottom: '12px', marginTop: '10px' }} />
+                                        <div className="skeleton-shimmer" style={{ width: '40%', height: '12px', borderRadius: '4px', marginBottom: '8px' }} />
+                                        <div className="skeleton-shimmer" style={{ width: '90%', height: '12px', borderRadius: '4px' }} />
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '8px', marginTop: '20px' }}>
+                                        <div className="skeleton-shimmer" style={{ flex: 1, height: '32px', borderRadius: '6px' }} />
+                                        <div className="skeleton-shimmer" style={{ flex: 1, height: '32px', borderRadius: '6px' }} />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : filteredProjects.length === 0 ? (
                         <div style={{
                             background: 'var(--bg-panel)',
                             border: '1px dashed var(--border-color)',
@@ -278,6 +304,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
                                             <h3 className="h2" style={{ fontSize: '16px', marginBottom: '4px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
                                                 {p.projectName}
+                                                {p.localExists === false && <span style={{ color: 'var(--error)', fontSize: '11px', marginLeft: '8px', fontWeight: 500 }}>(Files Missing Locally)</span>}
                                             </h3>
                                             <span className="text-muted" style={{ fontSize: '11px', wordBreak: 'break-all' }}>
                                                 {p.projectPath}
@@ -314,9 +341,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                                             onTriggerDeploy(p.projectPath, p.projectName);
                                                         }
                                                     }}
-                                                    disabled={isDeploying || !p.hasConfig}
+                                                    disabled={isDeploying || !p.hasConfig || p.localExists === false}
                                                     className={p.status === 'Stopped' ? 'btn btn-secondary' : 'btn btn-primary'}
                                                     style={{ flex: 1, padding: '6px 12px', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                                                    title={p.localExists === false ? "Local project source directory not found" : ""}
                                                 >
                                                     <DeployIcon size={12} />
                                                     {isDeploying ? 'Deploying...' : (p.status === 'Stopped' ? 'Resume' : 'Deploy')}
@@ -368,13 +396,32 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     )}
                 </div>
 
-                {/* External / Live-only Projects Section */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '16px' }}>
                     <h2 className="h2" style={{ fontSize: '14px', letterSpacing: '0.05em', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
-                        External / Live-only Projects ({filteredExternalProjects.length})
+                        External / Live-only Projects {isLoading ? '(Loading...)' : `(${filteredExternalProjects.length})`}
                     </h2>
 
-                    {filteredExternalProjects.length === 0 ? (
+                    {isLoading ? (
+                        <div className="card-grid">
+                            {[1, 2].map((i) => (
+                                <div key={i} className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '210px' }}>
+                                    <div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                                            <div className="skeleton-shimmer" style={{ width: '60px', height: '16px', borderRadius: '4px' }} />
+                                            <div className="skeleton-shimmer" style={{ width: '80px', height: '16px', borderRadius: '4px' }} />
+                                        </div>
+                                        <div className="skeleton-shimmer" style={{ width: '70%', height: '20px', borderRadius: '4px', marginBottom: '12px', marginTop: '10px' }} />
+                                        <div className="skeleton-shimmer" style={{ width: '40%', height: '12px', borderRadius: '4px', marginBottom: '8px' }} />
+                                        <div className="skeleton-shimmer" style={{ width: '90%', height: '12px', borderRadius: '4px' }} />
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '8px', marginTop: '20px' }}>
+                                        <div className="skeleton-shimmer" style={{ flex: 1, height: '32px', borderRadius: '6px' }} />
+                                        <div className="skeleton-shimmer" style={{ flex: 1, height: '32px', borderRadius: '6px' }} />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : filteredExternalProjects.length === 0 ? (
                         <div style={{
                             background: 'var(--bg-panel)',
                             border: '1px dashed var(--border-color)',

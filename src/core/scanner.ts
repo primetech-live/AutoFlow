@@ -94,13 +94,49 @@ export class ProjectScanner {
                         } catch {
                             // fall back to default
                         }
+                    } else if (hasGoMod) {
+                        appType = 'go';
+                    } else if (hasPom) {
+                        appType = 'java';
+                    } else if (hasGemfile) {
+                        try {
+                            const gemfileContent = fs.readFileSync(path.join(dirPath, 'Gemfile'), 'utf-8');
+                            appType = gemfileContent.includes('rails') ? 'rails' : 'ruby';
+                        } catch {
+                            appType = 'ruby';
+                        }
+                    } else if (hasRequirements) {
+                        try {
+                            const req = fs.readFileSync(path.join(dirPath, 'requirements.txt'), 'utf-8').toLowerCase();
+                            if (fs.existsSync(path.join(dirPath, 'manage.py')) && req.includes('django')) {
+                                appType = 'django';
+                            } else if (req.includes('flask')) {
+                                appType = 'flask';
+                            } else {
+                                appType = 'python';
+                            }
+                        } catch {
+                            appType = 'python';
+                        }
+                    } else if (hasIndexPhp) {
+                        appType = 'php';
                     } else if (hasPackageJson) {
                         try {
-                            const pkg = JSON.parse(await fs.promises.readFile(path.join(dirPath, 'package.json'), 'utf-8'));
+                            const pkg = JSON.parse(fs.readFileSync(path.join(dirPath, 'package.json'), 'utf-8'));
                             projectName = pkg.name || projectName;
+                            const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+                            if (deps.next) appType = 'next';
+                            else if (deps.nuxt) appType = 'nuxt';
+                            else if (deps.vue) appType = 'vue';
+                            else if (deps.vite) appType = 'vite';
+                            else if (deps['react-scripts']) appType = 'react';
+                            else if (deps['@angular/cli']) appType = 'angular';
+                            else appType = 'node';
                         } catch {
-                            // ignore invalid package.json
+                            appType = 'node';
                         }
+                    } else if (hasIndexHtml) {
+                        appType = 'static';
                     }
 
                     // Try to extract git remote URL from .git/config if not defined in config

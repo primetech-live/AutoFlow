@@ -40,13 +40,19 @@ class ConnectionManager extends EventEmitter {
         }
     }
 
-    /**
-     * Establish a persistent SSH session. Safe to call multiple times —
-     * returns immediately if already connected.
-     */
     public async connect(config: GlobalConfig): Promise<void> {
-        if (this.state === 'Connected' && this.ssh) {
-            return; // Already connected — reuse the session
+        const configChanged = !this.config || 
+            this.config.serverIp !== config.serverIp ||
+            this.config.sshUser !== config.sshUser ||
+            this.config.sshPort !== config.sshPort ||
+            this.config.sshKeyPath !== config.sshKeyPath;
+
+        if (this.state === 'Connected' && this.ssh && !configChanged) {
+            return; // Already connected to the same server — reuse the session
+        }
+
+        if (configChanged && this.state !== 'Disconnected') {
+            await this.disconnect();
         }
 
         this.config = config;
@@ -74,15 +80,15 @@ class ConnectionManager extends EventEmitter {
         }
 
         this.ssh = new NodeSSH();
-        let privateKeyPath = this.config.sshKeyPath.replace(/^"|"$/g, '');
+        let privateKeyPath = this.config.sshKeyPath.trim().replace(/^"|"$/g, '');
         if (privateKeyPath.startsWith('~')) {
             const os = require('os');
             privateKeyPath = privateKeyPath.replace('~', os.homedir());
         }
 
         const connectOptions: any = {
-            host: this.config.serverIp,
-            username: this.config.sshUser,
+            host: this.config.serverIp.trim(),
+            username: this.config.sshUser.trim(),
             port: Number(this.config.sshPort),
             readyTimeout: 15000,
             keepaliveInterval: 30000,
@@ -93,16 +99,25 @@ class ConnectionManager extends EventEmitter {
         let sshPassword = '';
         const vault = loadVaultConfig();
 
-        if (!fs.existsSync(privateKeyPath)) {
-            usePassword = true;
+        if (privateKeyPath) {
+            if (!fs.existsSync(privateKeyPath)) {
+                usePassword = true;
+                if (!(vault && vault.sshPassword && vaultEngine.isUnlocked())) {
+                    throw new Error(`SSH Key file not found at path: "${privateKeyPath}". Please verify that the file exists and the path is correct.`);
+                }
+            } else {
+                connectOptions.privateKeyPath = privateKeyPath;
+            }
         } else {
-            connectOptions.privateKeyPath = privateKeyPath;
+            usePassword = true;
         }
 
         try {
-            if (usePassword) throw new Error('Key not found');
+            if (usePassword && !connectOptions.privateKeyPath) {
+                throw new Error('Key file missing');
+            }
             await this.ssh.connect(connectOptions);
-        } catch (initialErr) {
+        } catch (initialErr: any) {
             console.warn('[ConnectionManager] SSH Key auth failed or key missing. Falling back to password authentication.');
             
             if (vault && vault.sshPassword && vaultEngine.isUnlocked()) {
@@ -111,7 +126,9 @@ class ConnectionManager extends EventEmitter {
                 connectOptions.password = sshPassword;
                 await this.ssh.connect(connectOptions);
             } else {
-                throw new Error('SSH Key failed and Vault is locked or missing password. Cannot authenticate.');
+                throw new Error(initialErr.message === 'Key file missing' ? 
+                    'SSH Key failed: Key file not found and Vault is locked or missing password. Cannot authenticate.' :
+                    `SSH Key failed: ${initialErr.message || 'Authentication failed'}. Vault is locked or missing password.`);
             }
         }
 
@@ -135,7 +152,7 @@ class ConnectionManager extends EventEmitter {
      * Implements exponential backoff reconnect.
      */
     private _handleUnexpectedDisconnect() {
-        if (this.state === 'Disconnected') return; // Already handled
+        if (this.state !== 'Connected') return; // Only reconnect if we were actively connected
 
         this._stopKeepalive();
         this.setState('Reconnecting');

@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { SuccessIcon, WarningIcon, SyncIcon } from './Icons';
 
+declare global {
+    interface Window {
+        autoflow: any;
+    }
+}
+
 interface DepStatus {
     name: string;
     installed: boolean;
@@ -21,7 +27,7 @@ export const DependencyInstaller: React.FC<Props> = ({ onClose }) => {
     
     useEffect(() => {
         if (step === 'Analyze') {
-            runAnalysis();
+            runAnalysis(false);
         }
     }, [step]);
 
@@ -30,7 +36,7 @@ export const DependencyInstaller: React.FC<Props> = ({ onClose }) => {
         window.autoflow.onInstallerLog(handleLog);
     }, []);
 
-    const runAnalysis = async () => {
+    const runAnalysis = async (isVerification = false) => {
         try {
             const res = await window.autoflow.checkDependencies();
             setPkgManager(res.pkgManager);
@@ -48,7 +54,9 @@ export const DependencyInstaller: React.FC<Props> = ({ onClose }) => {
             if (res.deps.every((d: DepStatus) => d.installed || d.category === 'Recommended')) {
                 // If all required are installed, maybe we just show Review and they can skip
             }
-            setTimeout(() => setStep('Review'), 1000); // Artificial delay for UX
+            if (!isVerification) {
+                setTimeout(() => setStep('Review'), 1000); // Artificial delay for UX
+            }
         } catch (err) {
             setLogs([`Analysis failed: ${err}`]);
         }
@@ -67,7 +75,7 @@ export const DependencyInstaller: React.FC<Props> = ({ onClose }) => {
         try {
             await window.autoflow.installDependencies(Array.from(selectedDeps), pkgManager);
             setStep('Verify');
-            await runAnalysis(); // Re-run analysis for verification
+            await runAnalysis(true); // Re-run analysis for verification
         } catch (err: any) {
             setLogs(prev => [...prev, `Installation Error: ${err.message}`]);
         }
