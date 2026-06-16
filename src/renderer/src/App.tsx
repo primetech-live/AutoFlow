@@ -169,16 +169,19 @@ const App: React.FC = () => {
                 const cleanName = cleanContainerName(c.name);
                 return !projects.some(p => p.projectName === cleanName);
             })
-            .map(c => ({
-                projectName: cleanContainerName(c.name),
-                projectPath: 'VPS Live-only',
-                hasConfig: false,
-                appType: c.name.startsWith('[pm2] ') ? 'node' : (c.name.startsWith('[systemd] ') ? 'systemd' : 'docker'),
-                gitRepo: '',
-                status: 'Live' as const,
-                isExternal: true,
-                containerRawName: c.name
-            }));
+            .map(c => {
+                const isStopped = c.status.toLowerCase().includes('exited') || c.status.toLowerCase().includes('created');
+                return {
+                    projectName: cleanContainerName(c.name),
+                    projectPath: 'VPS Live-only',
+                    hasConfig: false,
+                    appType: c.name.startsWith('[pm2] ') ? 'node' : (c.name.startsWith('[systemd] ') ? 'systemd' : 'docker'),
+                    gitRepo: '',
+                    status: (isStopped ? 'Stopped' : 'Live') as 'Live' | 'Stopped',
+                    isExternal: true,
+                    containerRawName: c.name
+                };
+            });
     }, [vpsContainers, projects]);
 
     // Filter out migrated projects that are idle/unverified in the current server scope to prevent cross-server UI pollution
