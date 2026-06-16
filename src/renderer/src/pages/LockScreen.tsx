@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { LockIcon, WarningIcon } from '../components/Icons';
 import appIcon from '../../assets/icon-1.png';
+import loginNaturalVisual from '../../assets/login_natural_visual.png';
 import { PasswordInput } from '../components/PasswordInput';
 
 interface LockScreenProps {
@@ -59,13 +60,14 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlockSuccess, onReset
             overflow: 'hidden',
             boxSizing: 'border-box'
         }}>
-            {/* Left Container: Visual Graphic (60% width) */}
+            {/* Left Container: Realistic Workspace Image (60% width) */}
             {!isMobile && (
                 <div style={{
                     width: '60%',
                     height: '100%',
                     position: 'relative',
-                    background: '#070a13',
+                    background: `url(${loginNaturalVisual}) no-repeat center center`,
+                    backgroundSize: 'cover',
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'flex-end',
@@ -73,124 +75,16 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlockSuccess, onReset
                     boxSizing: 'border-box',
                     overflow: 'hidden'
                 }}>
-                    {/* Futuristic Grid Pattern */}
+                    {/* Soft dark gradient overlay for bottom typography readability */}
                     <div style={{
                         position: 'absolute',
                         top: 0,
                         left: 0,
                         right: 0,
                         bottom: 0,
-                        backgroundImage: 'radial-gradient(rgba(34, 211, 238, 0.12) 1.5px, transparent 1.5px)',
-                        backgroundSize: '32px 32px',
-                        zIndex: 0
-                    }} />
-
-                    {/* Ambient Glow Blobs */}
-                    <div style={{
-                        width: '320px',
-                        height: '320px',
-                        borderRadius: '50%',
-                        background: 'rgba(34, 211, 238, 0.12)',
-                        filter: 'blur(80px)',
-                        position: 'absolute',
-                        top: '15%',
-                        left: '10%',
+                        background: 'linear-gradient(to top, rgba(10, 15, 30, 0.9) 20%, rgba(10, 15, 30, 0.2) 100%)',
                         zIndex: 1
                     }} />
-
-                    <div style={{
-                        width: '280px',
-                        height: '280px',
-                        borderRadius: '50%',
-                        background: 'rgba(99, 102, 241, 0.12)',
-                        filter: 'blur(75px)',
-                        position: 'absolute',
-                        bottom: '20%',
-                        right: '15%',
-                        zIndex: 1
-                    }} />
-
-                    {/* Architectural SVG Illustration */}
-                    <div style={{
-                        position: 'absolute',
-                        top: '40%',
-                        left: '50%',
-                        transform: 'translate(-50%, -50%)',
-                        width: '100%',
-                        maxWidth: '440px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        zIndex: 2
-                    }}>
-                        <svg width="400" height="180" viewBox="0 0 400 180" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ overflow: 'visible' }}>
-                            {/* Connection Line */}
-                            <path d="M 80 90 L 320 90" stroke="url(#line-grad)" strokeWidth="3" strokeDasharray="6 4" />
-                            
-                            {/* Animated Flow Dot */}
-                            <circle r="6" fill="#22d3ee">
-                                <animateMotion dur="4s" repeatCount="indefinite" path="M 80 90 L 320 90" />
-                            </circle>
-                            
-                            {/* Local Workstation Node */}
-                            <g transform="translate(40, 50)">
-                                <rect width="80" height="80" rx="16" fill="#0b0f19" stroke="rgba(255,255,255,0.08)" strokeWidth="2" />
-                                <circle cx="40" cy="40" r="22" fill="rgba(99, 102, 241, 0.08)" />
-                                <path d="M28 47h24v4H28zm4-30h16v24H32z" fill="#6366f1" />
-                                <text x="40" y="105" fill="#94a3b8" fontSize="11" textAnchor="middle" fontWeight="600">Workstation</text>
-                            </g>
-                            
-                            {/* Remote Server Node */}
-                            <g transform="translate(280, 50)">
-                                <rect width="80" height="80" rx="16" fill="#0b0f19" stroke="#22d3ee" strokeWidth="2" style={{ filter: 'drop-shadow(0 0 12px rgba(34,211,238,0.25))' }} />
-                                <circle cx="40" cy="40" r="22" fill="rgba(34, 211, 238, 0.08)" />
-                                <path d="M28 30h24v6H28zm0 10h24v6H28zm0 10h24v6H28z" fill="#22d3ee" />
-                                <text x="40" y="105" fill="#22d3ee" fontSize="11" textAnchor="middle" fontWeight="600">Production VPS</text>
-                            </g>
-
-                            {/* Gradients */}
-                            <defs>
-                                <linearGradient id="line-grad" x1="0" y1="0" x2="1" y2="0">
-                                    <stop offset="0%" stopColor="#6366f1" />
-                                    <stop offset="50%" stopColor="#a855f7" />
-                                    <stop offset="100%" stopColor="#22d3ee" />
-                                </linearGradient>
-                            </defs>
-                        </svg>
-                        
-                        {/* Deployment Stats Box (Glassmorphic) */}
-                        <div style={{
-                            marginTop: '36px',
-                            background: 'rgba(11, 15, 25, 0.65)',
-                            backdropFilter: 'blur(16px)',
-                            border: '1px solid rgba(255,255,255,0.06)',
-                            borderRadius: '12px',
-                            padding: '16px 20px',
-                            width: '320px',
-                            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.4)',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '10px',
-                            boxSizing: 'border-box'
-                        }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '12.5px', color: 'rgba(255,255,255,0.6)', fontWeight: 500 }}>Active Deploy Pipeline</span>
-                                <span style={{ fontSize: '10px', color: '#22d3ee', background: 'rgba(34, 211, 238, 0.1)', padding: '2px 8px', borderRadius: '12px', fontWeight: 600 }}>ONLINE</span>
-                            </div>
-                            <div style={{ height: '1px', background: 'rgba(255,255,255,0.06)' }} />
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px' }}>
-                                    <span style={{ color: 'rgba(255,255,255,0.45)' }}>Connection Status</span>
-                                    <span style={{ color: '#fff', fontWeight: 500 }}>Encrypted SSH</span>
-                                </div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px' }}>
-                                    <span style={{ color: 'rgba(255,255,255,0.45)' }}>Docker Build Cache</span>
-                                    <span style={{ color: '#22c55e', fontWeight: 500 }}>Verified</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
 
                     {/* Typography Content */}
                     <div style={{ zIndex: 2, color: '#ffffff', maxWidth: '520px' }}>
@@ -200,7 +94,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlockSuccess, onReset
                             marginBottom: '16px', 
                             lineHeight: '1.25',
                             letterSpacing: '-0.02em',
-                            background: 'linear-gradient(135deg, #ffffff 40%, #a5f3fc 100%)',
+                            background: 'linear-gradient(135deg, #ffffff 40%, #e2e8f0 100%)',
                             WebkitBackgroundClip: 'text',
                             WebkitTextFillColor: 'transparent'
                         }}>
@@ -208,7 +102,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlockSuccess, onReset
                         </h1>
                         <p style={{ 
                             fontSize: '15px', 
-                            color: 'rgba(255, 255, 255, 0.75)', 
+                            color: 'rgba(255, 255, 255, 0.8)', 
                             lineHeight: '1.6', 
                             margin: 0,
                             fontWeight: 400
