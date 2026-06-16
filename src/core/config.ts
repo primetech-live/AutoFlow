@@ -77,7 +77,9 @@ export function getWorkspaceDirectory(): string {
             return path.resolve(config.workspacePath);
         }
     } catch {}
-    return path.resolve(process.cwd());
+    // Fall back to user home directory so projects anywhere on the machine are accessible.
+    // process.cwd() was the AutoFlow install dir, which silently blocked all project imports.
+    return os.homedir();
 }
 
 export function isPathInWorkspace(targetPath: string): boolean {

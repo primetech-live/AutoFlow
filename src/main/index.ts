@@ -17,6 +17,7 @@ function createWindow() {
         minWidth: 950,
         minHeight: 650,
         frame: false,
+        kiosk: true, // Enables Kiosk mode / Maximized full screen
         backgroundColor: '#141416',
         show: false,
         webPreferences: {

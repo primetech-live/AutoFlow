@@ -182,9 +182,13 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
         return result.filePaths[0];
     });
 
-    // Project Scanner
+    // Project Scanner — no workspace restriction; user can scan any folder they choose
     ipcMain.handle('scanner:start', async (event, rootDir) => {
-        assertPathInWorkspace(rootDir);
+        // Basic sanity: must be an absolute path
+        if (!path.isAbsolute(rootDir)) {
+            mainWindow.webContents.send('scanner:finished', []);
+            return;
+        }
         try {
             const projects = await projectScanner.scan(
                 rootDir,
@@ -277,32 +281,26 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
     });
 
     ipcMain.handle('projects:add', (_, projectPath) => {
-        assertPathInWorkspace(projectPath);
         addProjectToSaved(projectPath);
     });
 
     ipcMain.handle('projects:remove', (_, projectPath) => {
-        assertPathInWorkspace(projectPath);
         removeProjectFromSaved(projectPath);
     });
 
     ipcMain.handle('projects:load-config', (_, projectPath) => {
-        assertPathInWorkspace(projectPath);
         return loadProjectConfig(projectPath);
     });
 
     ipcMain.handle('projects:save-config', (_, projectPath, config) => {
-        assertPathInWorkspace(projectPath);
         return saveProjectConfig(config, projectPath);
     });
 
     ipcMain.handle('projects:config-exists', (_, projectPath) => {
-        assertPathInWorkspace(projectPath);
         return projectConfigExists(projectPath);
     });
 
     ipcMain.handle('projects:init', async (_, projectPath, options) => {
-        assertPathInWorkspace(projectPath);
         mainWindow.webContents.send('init:started', { projectName: options.projectName, startTime: Date.now() });
 
         const logListener = (type: LogType, message: string) => {
@@ -342,7 +340,6 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
 
     // Deploy actions — run deployProjectCore directly in the main process and stream logs
     ipcMain.handle('deploy:run', async (_, projectPath) => {
-        assertPathInWorkspace(projectPath);
         const deployProjectCore = require('../commands/deploy/index').default;
         const { loadProjectConfig } = require('../core/config');
         const startTime = Date.now();
@@ -403,7 +400,6 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
     });
 
     ipcMain.handle('deploy:rollback', async (_, projectPath, commitSha) => {
-        assertPathInWorkspace(projectPath);
         let originalBranch = 'main';
         try {
             originalBranch = execSync('git symbolic-ref --short HEAD', { cwd: projectPath }).toString().trim();
@@ -439,7 +435,6 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
     });
 
     ipcMain.handle('projects:load-env', async (_, projectPath) => {
-        assertPathInWorkspace(projectPath);
         const envPath = path.join(projectPath, '.env');
         if (!fs.existsSync(envPath)) return {};
         try {
@@ -461,7 +456,6 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
     });
 
     ipcMain.handle('projects:save-env', async (_, projectPath, env) => {
-        assertPathInWorkspace(projectPath);
         const envPath = path.join(projectPath, '.env');
         try {
             const lines = Object.entries(env).map(([k, v]) => `${k}=${v}`);

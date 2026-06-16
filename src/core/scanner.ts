@@ -60,9 +60,10 @@ export class ProjectScanner {
             const { dirPath, depth } = current;
             scannedCount++;
 
-            // Periodically yield control to the event loop to keep the UI responsive
+            // Always send live progress so UI never shows 0 for small dirs.
+            // Yield to event loop every 50 dirs to keep UI responsive.
+            onProgress(scannedCount, dirPath);
             if (scannedCount % 50 === 0) {
-                onProgress(scannedCount, dirPath);
                 await new Promise(resolve => setImmediate(resolve));
             }
 
