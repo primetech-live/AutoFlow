@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LockIcon, WarningIcon } from '../components/Icons';
 import appIcon from '../../assets/icon-1.png';
+import loginVisual from '../../assets/login_visual.png';
 import { PasswordInput } from '../components/PasswordInput';
 
 interface LockScreenProps {
@@ -13,11 +14,25 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlockSuccess, onReset
     const [otp, setOtp] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 850);
+
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth < 850);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
         setLoading(true);
+        
+        // Ensure OTP has correct digits length
+        if (otp.length !== 6 || !/^\d+$/.test(otp)) {
+            setError('Please enter a valid 6-digit OTP token.');
+            setLoading(false);
+            return;
+        }
 
         try {
             const success = await window.autoflow.unlockVault(password, otp);
@@ -39,108 +54,196 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlockSuccess, onReset
             height: '100%',
             width: '100%',
             display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexDirection: 'column',
-            padding: '24px'
+            flexDirection: 'row',
+            margin: 0,
+            padding: 0,
+            overflow: 'hidden',
+            boxSizing: 'border-box'
         }}>
+            {/* Left Container: Visual Graphic (60% width) */}
+            {!isMobile && (
+                <div style={{
+                    width: '60%',
+                    height: '100%',
+                    position: 'relative',
+                    background: `url(${loginVisual}) no-repeat center center`,
+                    backgroundSize: 'cover',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'flex-end',
+                    padding: '60px',
+                    boxSizing: 'border-box'
+                }}>
+                    {/* Dark gradient overlay for typography readability */}
+                    <div style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: 'linear-gradient(to top, rgba(10, 15, 30, 0.95) 15%, rgba(10, 15, 30, 0.4) 100%)',
+                        zIndex: 1
+                    }} />
+                    
+                    <div style={{ zIndex: 2, color: '#ffffff', maxWidth: '520px' }}>
+                        <h1 style={{ 
+                            fontSize: '34px', 
+                            fontWeight: 800, 
+                            marginBottom: '16px', 
+                            lineHeight: '1.25',
+                            letterSpacing: '-0.02em',
+                            background: 'linear-gradient(135deg, #ffffff 40%, #a5f3fc 100%)',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent'
+                        }}>
+                            Zero-Config VPS Deployments
+                        </h1>
+                        <p style={{ 
+                            fontSize: '15px', 
+                            color: 'rgba(255, 255, 255, 0.75)', 
+                            lineHeight: '1.6', 
+                            margin: 0,
+                            fontWeight: 400
+                        }}>
+                            AutoFlow vNext orchestrates Git syncs, builds Docker containers, configures Nginx proxies, and secures HTTPS certifications automatically on your VPS.
+                        </p>
+                    </div>
+                </div>
+            )}
+
+            {/* Right Container: CRM Form Login (40% width) */}
             <div style={{
-                background: 'var(--bg-panel)',
-                border: '1px solid var(--border-color)',
-                borderRadius: '12px',
-                padding: '40px',
-                width: '400px',
-                maxWidth: '100%',
-                boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+                width: isMobile ? '100%' : '40%',
+                height: '100%',
                 display: 'flex',
                 flexDirection: 'column',
-                alignItems: 'center'
+                justifyContent: 'center',
+                alignItems: 'center',
+                background: 'var(--bg-main)',
+                borderLeft: isMobile ? 'none' : '1px solid var(--border-color)',
+                padding: '40px',
+                boxSizing: 'border-box',
+                position: 'relative'
             }}>
                 <div style={{
-                    marginBottom: '20px',
+                    width: '100%',
+                    maxWidth: '360px',
                     display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
+                    flexDirection: 'column'
                 }}>
-                    <img src={appIcon} alt="Autoflow Icon" style={{ width: '80px', height: '80px', borderRadius: '16px' }} />
-                </div>
-                
-                <h2 className="h2" style={{ marginBottom: '8px', textAlign: 'center' }}>Session Locked</h2>
-                <p className="text-secondary" style={{ fontSize: '13px', marginBottom: '28px', textAlign: 'center' }}>
-                    Enter your master password and Google Authenticator OTP to unlock the Autoflow vNext platform.
-                </p>
-
-                {error && (
                     <div style={{
-                        background: 'var(--error-glow)',
-                        border: '1px solid rgba(239, 68, 68, 0.2)',
-                        color: 'var(--error)',
-                        padding: '10px 14px',
-                        borderRadius: '6px',
-                        fontSize: '12.5px',
-                        width: '100%',
-                        marginBottom: '16px',
+                        marginBottom: '28px',
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px'
+                        gap: '12px'
                     }}>
-                        <WarningIcon size={14} /> {error}
-                    </div>
-                )}
-
-                <form onSubmit={handleSubmit} style={{ width: '100%' }}>
-                    <div className="form-group">
-                        <label className="form-label">Master Password</label>
-                        <PasswordInput
-                            required
-                            placeholder="••••••••"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                        />
+                        <img src={appIcon} alt="Autoflow Icon" style={{ width: '44px', height: '44px', borderRadius: '10px' }} />
+                        <div>
+                            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: 'var(--text-main)' }}>AutoFlow</h3>
+                            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>vNext platform</span>
+                        </div>
                     </div>
                     
-                    <div className="form-group" style={{ marginBottom: '24px' }}>
-                        <label className="form-label">Authenticator OTP Token</label>
-                        <input
-                            type="text"
-                            required
-                            maxLength={6}
-                            pattern="\d{6}"
-                            placeholder="123456"
-                            className="input"
-                            value={otp}
-                            onChange={(e) => setOtp(e.target.value)}
-                            style={{ letterSpacing: '0.2em', textAlign: 'center', fontSize: '16px', fontWeight: 700 }}
-                        />
-                    </div>
+                    <h2 className="h2" style={{ marginBottom: '8px', textAlign: 'left', fontSize: '24px', fontWeight: 700 }}>Welcome Back</h2>
+                    <p className="text-secondary" style={{ fontSize: '13px', marginBottom: '28px', textAlign: 'left', lineHeight: '1.5' }}>
+                        Unlock the platform by entering your master password and 2FA authentication token.
+                    </p>
 
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="btn btn-primary"
-                        style={{ width: '100%', padding: '12px' }}
-                    >
-                        {loading ? 'Verifying...' : 'Unlock Platform'}
-                    </button>
-                    
-                    {onResetRequest && (
-                        <div style={{ textAlign: 'center', marginTop: '16px' }}>
-                            <a 
-                                href="#" 
-                                onClick={(e) => { e.preventDefault(); onResetRequest(); }}
-                                style={{ fontSize: '12px', color: 'var(--text-muted)', textDecoration: 'underline', cursor: 'pointer' }}
-                            >
-                                Forgot password? Reset everything
-                            </a>
+                    {error && (
+                        <div style={{
+                            background: 'var(--error-glow)',
+                            border: '1px solid rgba(239, 68, 68, 0.2)',
+                            color: 'var(--error)',
+                            padding: '10px 14px',
+                            borderRadius: '6px',
+                            fontSize: '12.5px',
+                            width: '100%',
+                            marginBottom: '16px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                        }}>
+                            <WarningIcon size={14} /> {error}
                         </div>
                     )}
-                </form>
+
+                    <form onSubmit={handleSubmit} style={{ width: '100%' }}>
+                        <div className="form-group" style={{ marginBottom: '18px' }}>
+                            <label className="form-label">Master Password</label>
+                            <PasswordInput
+                                required
+                                placeholder="••••••••"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                            />
+                        </div>
+                        
+                        <div className="form-group" style={{ marginBottom: '28px' }}>
+                            <label className="form-label">Authenticator OTP Token</label>
+                            <input
+                                type="text"
+                                required
+                                maxLength={6}
+                                pattern="\d{6}"
+                                placeholder="123456"
+                                className="input"
+                                value={otp}
+                                onChange={(e) => setOtp(e.target.value)}
+                                style={{ 
+                                    letterSpacing: '0.25em', 
+                                    textAlign: 'center', 
+                                    fontSize: '18px', 
+                                    fontWeight: 700,
+                                    color: 'var(--text-main)'
+                                }}
+                            />
+                        </div>
+
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="btn btn-primary"
+                            style={{ 
+                                width: '100%', 
+                                padding: '12px', 
+                                fontSize: '14px', 
+                                fontWeight: 600,
+                                cursor: loading ? 'not-allowed' : 'pointer'
+                            }}
+                        >
+                            {loading ? 'Verifying...' : 'Unlock Platform'}
+                        </button>
+                        
+                        {onResetRequest && (
+                            <div style={{ textAlign: 'center', marginTop: '20px' }}>
+                                <a 
+                                    href="#" 
+                                    onClick={(e) => { e.preventDefault(); onResetRequest(); }}
+                                    style={{ 
+                                        fontSize: '12px', 
+                                        color: 'var(--text-muted)', 
+                                        textDecoration: 'underline', 
+                                        cursor: 'pointer' 
+                                    }}
+                                >
+                                    Forgot password? Reset everything
+                                </a>
+                            </div>
+                        )}
+                    </form>
+                </div>
+                
+                <span style={{ 
+                    position: 'absolute', 
+                    bottom: '24px', 
+                    fontSize: '11px', 
+                    color: 'var(--text-muted)',
+                    textAlign: 'center',
+                    width: 'calc(100% - 80px)'
+                }}>
+                    AutoFlow automatically locks after 15 minutes of inactivity.
+                </span>
             </div>
-            
-            <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '24px' }}>
-                Autoflow automatically locks after 15 minutes of inactivity.
-            </span>
         </div>
     );
 };
