@@ -2,7 +2,7 @@ import simpleGit from 'simple-git';
 import log from '../../utils/logger';
 import { AutoFlowError, EXIT_CODES } from './errors';
 
-export async function syncLocalGit(projectDir: string = process.cwd()): Promise<string> {
+export async function syncLocalGit(projectDir: string = process.cwd(), branch?: string): Promise<string> {
     const git = simpleGit(projectDir);
 
     log.info('Checking local git status...');
@@ -18,8 +18,12 @@ export async function syncLocalGit(projectDir: string = process.cwd()): Promise<
             log.info('Working directory is clean.');
         }
 
-        log.info('Pushing to remote...');
-        await git.push();
+        log.info(branch ? `Pushing to remote branch "${branch}"...` : 'Pushing to remote...');
+        if (branch) {
+            await git.push('origin', branch);
+        } else {
+            await git.push();
+        }
         log.success('Code pushed to remote successfully ✔');
 
         // Get the latest SHA

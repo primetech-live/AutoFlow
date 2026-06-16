@@ -16,11 +16,17 @@ import {
     loadProjectConfig,
     saveProjectConfig,
     projectConfigExists,
-    loadSavedProjectsWithMetadata
+    loadSavedProjectsWithMetadata,
+    isPathInWorkspace
 } from '../core/config';
 
-import { vaultEngine } from '../core/vault';
-import { loadVaultConfig, saveVaultConfig } from '../utils/vaultService';
+function assertPathInWorkspace(targetPath: string) {
+    if (!isPathInWorkspace(targetPath)) {
+        throw new Error(`Access denied: Resolved path "${targetPath}" escapes workspace boundary`);
+    }
+}
+
+import { vaultEngine, loadVaultConfig, saveVaultConfig } from '../core/vault';
 import { projectScanner } from '../core/scanner';
 import { initProjectCore } from '../core/initializer';
 import { deployerEngine } from '../core/deployer';
@@ -90,9 +96,14 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
     });
 
     // Vault Security
-    ipcMain.handle('vault:exists', () => {
+    ipcMain.handle('vault:exists', async () => {
         const vaultPath = path.join(os.homedir(), '.autoflow', 'vault.json');
-        return fs.existsSync(vaultPath);
+        try {
+            await fs.promises.access(vaultPath, fs.constants.F_OK);
+            return true;
+        } catch {
+            return false;
+        }
     });
 
     ipcMain.handle('vault:setup', (_, password, totpSecret) => {
@@ -173,6 +184,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
 
     // Project Scanner
     ipcMain.handle('scanner:start', async (event, rootDir) => {
+        assertPathInWorkspace(rootDir);
         try {
             const projects = await projectScanner.scan(
                 rootDir,
@@ -265,26 +277,32 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
     });
 
     ipcMain.handle('projects:add', (_, projectPath) => {
+        assertPathInWorkspace(projectPath);
         addProjectToSaved(projectPath);
     });
 
     ipcMain.handle('projects:remove', (_, projectPath) => {
+        assertPathInWorkspace(projectPath);
         removeProjectFromSaved(projectPath);
     });
 
     ipcMain.handle('projects:load-config', (_, projectPath) => {
+        assertPathInWorkspace(projectPath);
         return loadProjectConfig(projectPath);
     });
 
     ipcMain.handle('projects:save-config', (_, projectPath, config) => {
+        assertPathInWorkspace(projectPath);
         return saveProjectConfig(config, projectPath);
     });
 
     ipcMain.handle('projects:config-exists', (_, projectPath) => {
+        assertPathInWorkspace(projectPath);
         return projectConfigExists(projectPath);
     });
 
     ipcMain.handle('projects:init', async (_, projectPath, options) => {
+        assertPathInWorkspace(projectPath);
         mainWindow.webContents.send('init:started', { projectName: options.projectName, startTime: Date.now() });
 
         const logListener = (type: LogType, message: string) => {
@@ -324,6 +342,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
 
     // Deploy actions — run deployProjectCore directly in the main process and stream logs
     ipcMain.handle('deploy:run', async (_, projectPath) => {
+        assertPathInWorkspace(projectPath);
         const deployProjectCore = require('../commands/deploy/index').default;
         const { loadProjectConfig } = require('../core/config');
         const startTime = Date.now();
@@ -384,6 +403,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
     });
 
     ipcMain.handle('deploy:rollback', async (_, projectPath, commitSha) => {
+        assertPathInWorkspace(projectPath);
         let originalBranch = 'main';
         try {
             originalBranch = execSync('git symbolic-ref --short HEAD', { cwd: projectPath }).toString().trim();
@@ -419,6 +439,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
     });
 
     ipcMain.handle('projects:load-env', async (_, projectPath) => {
+        assertPathInWorkspace(projectPath);
         const envPath = path.join(projectPath, '.env');
         if (!fs.existsSync(envPath)) return {};
         try {
@@ -440,10 +461,11 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
     });
 
     ipcMain.handle('projects:save-env', async (_, projectPath, env) => {
+        assertPathInWorkspace(projectPath);
         const envPath = path.join(projectPath, '.env');
         try {
             const lines = Object.entries(env).map(([k, v]) => `${k}=${v}`);
-            fs.writeFileSync(envPath, lines.join('\n'), 'utf-8');
+            await fs.promises.writeFile(envPath, lines.join('\n'), 'utf-8');
             return { success: true };
         } catch (err: any) {
             return { success: false, error: err.message };

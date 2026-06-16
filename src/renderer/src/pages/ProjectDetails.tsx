@@ -241,7 +241,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                 });
 
                 if (gitPat.trim()) {
-                    await window.autoflow.invoke('vault:save-git-pat', projectName, gitPat.trim());
+                    await window.autoflow.saveGitPat(projectName, gitPat.trim());
                     setGitPat(''); // clear field after save
                 }
 

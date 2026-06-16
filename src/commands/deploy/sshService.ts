@@ -1,14 +1,13 @@
 import { NodeSSH } from 'node-ssh';
 import log from '../../utils/logger';
-import { GlobalConfig } from '../../utils/config';
+import { GlobalConfig } from '../../core/config';
 import { AutoFlowError, EXIT_CODES, registerCleanupHandlers } from './errors';
 
 import { connectionManager } from '../../core/connection';
 import fs from 'fs';
 import os from 'os';
 import inquirer from 'inquirer';
-import { loadVaultConfig, saveVaultConfig } from '../../utils/vaultService';
-import { vaultEngine } from '../../core/vault';
+import { loadVaultConfig, saveVaultConfig, vaultEngine } from '../../core/vault';
 
 export async function connectSSH(config: GlobalConfig, isDesktop: boolean = false): Promise<NodeSSH> {
     if (isDesktop) {

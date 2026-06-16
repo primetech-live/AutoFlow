@@ -22,7 +22,7 @@ export async function initProjectCore(projectPath: string, options: InitOptions)
     log.header('AUTOFLOW INITIALIZATION');
 
     try {
-        spawnSync('git', ['ls-remote', gitRepo], { stdio: 'ignore' });
+        spawnSync('git', ['ls-remote', gitRepo], { stdio: 'ignore', timeout: 5000 });
     } catch (e) {
         log.warning('Private repository detected (authentication required).');
         log.warning('Please configure a Git Token in the Vault Settings before deploying.');

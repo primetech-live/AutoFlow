@@ -40,6 +40,9 @@ export async function execWithTimeout(
 ): Promise<{ stdout: string; stderr: string; code: number | null }> {
     return new Promise((resolve, reject) => {
         const timer = setTimeout(() => {
+            try {
+                ssh.dispose();
+            } catch (_) {}
             reject(new AutoFlowError(
                 `Command timed out after ${timeoutMs / 1000}s: ${command.trim().slice(0, 80)}`,
                 EXIT_CODES.SSH_TIMEOUT,

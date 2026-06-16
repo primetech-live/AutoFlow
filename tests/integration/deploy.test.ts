@@ -20,7 +20,7 @@ jest.mock('../../src/commands/deploy/containerService');
 jest.mock('../../src/commands/deploy/rollback');
 jest.mock('../../src/commands/deploy/portService');
 jest.mock('../../src/commands/deploy/ufwService');
-jest.mock('../../src/utils/vaultService');
+jest.mock('../../src/core/vault');
 
 describe('Deploy Integration', () => {
     it('should run the full happy path successfully', async () => {

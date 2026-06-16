@@ -1,4 +1,4 @@
-import { loadGlobalConfig, loadProjectConfig, MergedConfig } from '../../utils/config';
+import { loadGlobalConfig, loadProjectConfig, MergedConfig } from '../../core/config';
 import log from '../../utils/logger';
 
 export function loadConfig(projectDir: string = process.cwd()): MergedConfig {

@@ -1,7 +1,7 @@
 import { NodeSSH } from 'node-ssh';
 import chalk from 'chalk';
 import log from '../utils/logger';
-import { loadGlobalConfig, loadProjectConfig } from '../utils/config';
+import { loadGlobalConfig, loadProjectConfig } from '../core/config';
 import { escapeShellArg } from '../utils/shell';
 
 async function execSafe(ssh: NodeSSH, command: string): Promise<void> {
@@ -48,9 +48,9 @@ async function stop(isDesktop: boolean = false, projectDir: string = process.cwd
         // Also clean up the rollback snapshot if it exists
         await execSafe(ssh, `docker rm -f ${safeContainer}_rollback || true`);
 
-        // 2. Prune unused Docker resources
-        log.info('Pruning unused Docker resources...');
-        await execSafe(ssh, 'sudo docker system prune -f');
+        // 2. Prune dangling builder images for this project
+        log.info('Pruning unused Docker builder images...');
+        await execSafe(ssh, 'docker image prune -f');
 
         // 3. Remove Nginx config
         log.info('Disabling Nginx config...');
@@ -60,11 +60,7 @@ async function stop(isDesktop: boolean = false, projectDir: string = process.cwd
         log.info('Reloading Nginx...');
         await execSafe(ssh, 'sudo nginx -s reload');
 
-        // 5. Remove project files
-        log.info(`Removing project files at ${remoteProjectDir}...`);
-        await execSafe(ssh, `rm -rf ${safeRemoteProjectDir}`);
-
-        log.success('Service stopped and cleaned up ✅');
+        log.success('Service stopped successfully ✅');
         log.info('To redeploy, run: autoflow deploy');
 
     } catch (err) {

@@ -71,14 +71,29 @@ export async function verifyContainerHealth(
 ): Promise<void> {
     log.info('Verifying container health...');
 
-    // Wait a moment for the container to initialize
-    await new Promise((resolve) => setTimeout(resolve, 3000));
+    let isHealthy = false;
+    let attempts = 0;
+    const maxAttempts = 5;
+    const intervalMs = 2000;
 
-    const ps = await ssh.execCommand(
-        `docker ps --filter "name=${escapeShellArg(containerName)}" --format "{{.Status}}"`
-    );
+    while (attempts < maxAttempts) {
+        attempts++;
+        const ps = await ssh.execCommand(
+            `docker ps --filter "name=${escapeShellArg(containerName)}" --format "{{.Status}}"`
+        );
 
-    if (!ps.stdout || !ps.stdout.includes('Up')) {
+        if (ps.stdout && ps.stdout.includes('Up')) {
+            isHealthy = true;
+            break;
+        }
+
+        if (attempts < maxAttempts) {
+            log.info(`  ... Container not ready yet, retrying (${attempts}/${maxAttempts})...`);
+            await new Promise((resolve) => setTimeout(resolve, intervalMs));
+        }
+    }
+
+    if (!isHealthy) {
         const logs = await ssh.execCommand(`docker logs --tail 25 ${escapeShellArg(containerName)}`);
         console.log(chalk.red('\n=== CONTAINER LOGS (last 25 lines) ==='));
         console.log(chalk.red(logs.stdout || logs.stderr));

@@ -104,7 +104,16 @@ app.whenReady().then(async () => {
             if (privateKeyPath.startsWith('~')) {
                 privateKeyPath = privateKeyPath.replace('~', os.homedir());
             }
-            const usePassword = !privateKeyPath || !fs.existsSync(privateKeyPath);
+            let privateKeyExists = false;
+            if (privateKeyPath) {
+                try {
+                    await fs.promises.access(privateKeyPath, fs.constants.F_OK);
+                    privateKeyExists = true;
+                } catch {
+                    privateKeyExists = false;
+                }
+            }
+            const usePassword = !privateKeyPath || !privateKeyExists;
             if (!usePassword) {
                 await connectionManager.connect(config);
             }

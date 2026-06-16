@@ -2,8 +2,7 @@ import { NodeSSH } from 'node-ssh';
 import { GlobalConfig } from './config';
 import EventEmitter from 'events';
 import fs from 'fs';
-import { loadVaultConfig } from '../utils/vaultService';
-import { vaultEngine } from './vault';
+import { vaultEngine, loadVaultConfig } from './vault';
 
 export type ConnectionState = 'Disconnected' | 'Connecting' | 'Connected' | 'Reconnecting';
 

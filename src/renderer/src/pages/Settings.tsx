@@ -82,7 +82,7 @@ export const Settings: React.FC<SettingsProps> = ({ onReRunOnboarding, onResetCo
                 sshKeyPath: sshKeyPath.trim()
             });
             if (sshPassword) {
-                await window.autoflow.invoke('vault:save-ssh-password', sshPassword.trim());
+                await window.autoflow.saveSshPassword(sshPassword.trim());
                 setSshPassword(''); // Clear for security
             }
             // Reconnect SSH with the new settings

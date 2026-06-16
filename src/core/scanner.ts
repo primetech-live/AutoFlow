@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { loadProjectConfig, ProjectConfig } from './config';
+import { ProjectConfig } from './config';
 
 export interface ScannedProject {
     projectName: string;
@@ -70,15 +70,28 @@ export class ProjectScanner {
                 const stats = await fs.promises.stat(dirPath);
                 if (!stats.isDirectory()) continue;
 
-                // Check if this directory is a project
-                const hasConfig = fs.existsSync(path.join(dirPath, 'autoflow.config.json'));
-                const hasPackageJson = fs.existsSync(path.join(dirPath, 'package.json'));
-                const hasIndexHtml = fs.existsSync(path.join(dirPath, 'index.html'));
-                const hasIndexPhp = fs.existsSync(path.join(dirPath, 'index.php')) || fs.existsSync(path.join(dirPath, 'public/index.php'));
-                const hasGoMod = fs.existsSync(path.join(dirPath, 'go.mod'));
-                const hasRequirements = fs.existsSync(path.join(dirPath, 'requirements.txt'));
-                const hasGemfile = fs.existsSync(path.join(dirPath, 'Gemfile'));
-                const hasPom = fs.existsSync(path.join(dirPath, 'pom.xml'));
+                // Read files and subdirectories in this directory asynchronously
+                const files = await fs.promises.readdir(dirPath, { withFileTypes: true });
+                const fileNames = new Set(files.filter(f => f.isFile()).map(f => f.name));
+                const dirNames = new Set(files.filter(f => f.isDirectory()).map(f => f.name));
+
+                // Check if this directory is a project using async checks/Sets
+                const hasConfig = fileNames.has('autoflow.config.json');
+                const hasPackageJson = fileNames.has('package.json');
+                const hasIndexHtml = fileNames.has('index.html');
+                
+                let hasIndexPhp = fileNames.has('index.php');
+                if (!hasIndexPhp && dirNames.has('public')) {
+                    try {
+                        await fs.promises.access(path.join(dirPath, 'public', 'index.php'), fs.constants.F_OK);
+                        hasIndexPhp = true;
+                    } catch {}
+                }
+
+                const hasGoMod = fileNames.has('go.mod');
+                const hasRequirements = fileNames.has('requirements.txt');
+                const hasGemfile = fileNames.has('Gemfile');
+                const hasPom = fileNames.has('pom.xml');
 
                 if (hasConfig || hasPackageJson || hasIndexHtml || hasIndexPhp || hasGoMod || hasRequirements || hasGemfile || hasPom) {
                     let projectName = path.basename(dirPath);
@@ -87,7 +100,8 @@ export class ProjectScanner {
 
                     if (hasConfig) {
                         try {
-                            const config = loadProjectConfig(dirPath);
+                            const configContent = await fs.promises.readFile(path.join(dirPath, 'autoflow.config.json'), 'utf-8');
+                            const config = JSON.parse(configContent);
                             projectName = config.projectName || projectName;
                             appType = config.appType || appType;
                             gitRepo = config.gitRepo || '';
@@ -100,15 +114,15 @@ export class ProjectScanner {
                         appType = 'java';
                     } else if (hasGemfile) {
                         try {
-                            const gemfileContent = fs.readFileSync(path.join(dirPath, 'Gemfile'), 'utf-8');
+                            const gemfileContent = await fs.promises.readFile(path.join(dirPath, 'Gemfile'), 'utf-8');
                             appType = gemfileContent.includes('rails') ? 'rails' : 'ruby';
                         } catch {
                             appType = 'ruby';
                         }
                     } else if (hasRequirements) {
                         try {
-                            const req = fs.readFileSync(path.join(dirPath, 'requirements.txt'), 'utf-8').toLowerCase();
-                            if (fs.existsSync(path.join(dirPath, 'manage.py')) && req.includes('django')) {
+                            const req = (await fs.promises.readFile(path.join(dirPath, 'requirements.txt'), 'utf-8')).toLowerCase();
+                            if (fileNames.has('manage.py') && req.includes('django')) {
                                 appType = 'django';
                             } else if (req.includes('flask')) {
                                 appType = 'flask';
@@ -122,7 +136,7 @@ export class ProjectScanner {
                         appType = 'php';
                     } else if (hasPackageJson) {
                         try {
-                            const pkg = JSON.parse(fs.readFileSync(path.join(dirPath, 'package.json'), 'utf-8'));
+                            const pkg = JSON.parse(await fs.promises.readFile(path.join(dirPath, 'package.json'), 'utf-8'));
                             projectName = pkg.name || projectName;
                             const deps = { ...pkg.dependencies, ...pkg.devDependencies };
                             if (deps.next) appType = 'next';
@@ -143,7 +157,13 @@ export class ProjectScanner {
                     if (!gitRepo) {
                         try {
                             const gitConfigPath = path.join(dirPath, '.git', 'config');
-                            if (fs.existsSync(gitConfigPath)) {
+                            let hasGitConfig = false;
+                            try {
+                                await fs.promises.access(gitConfigPath, fs.constants.F_OK);
+                                hasGitConfig = true;
+                            } catch {}
+
+                            if (hasGitConfig) {
                                 const gitConfig = await fs.promises.readFile(gitConfigPath, 'utf-8');
                                 const match = gitConfig.match(/url\s*=\s*(.+)/);
                                 if (match && match[1]) {
@@ -173,7 +193,6 @@ export class ProjectScanner {
 
                 // If not at max depth, enqueue subdirectories
                 if (depth < maxDepth) {
-                    const files = await fs.promises.readdir(dirPath, { withFileTypes: true });
                     for (const file of files) {
                         if (file.isDirectory() && !EXCLUDE_DIRS.has(file.name) && !file.name.startsWith('.')) {
                             queue.push({
@@ -207,8 +226,11 @@ export class ProjectScanner {
         if (process.platform === 'win32') {
             const drives = ['D:\\', 'E:\\', 'F:\\', 'C:\\'];
             for (const drive of drives) {
-                if (drive !== 'C:\\' && fs.existsSync(drive)) {
-                    roots.push(drive);
+                if (drive !== 'C:\\') {
+                    try {
+                        await fs.promises.access(drive, fs.constants.F_OK);
+                        roots.push(drive);
+                    } catch {}
                 }
             }
         }
@@ -237,7 +259,13 @@ export class ProjectScanner {
 
             try {
                 const configPath = path.join(dirPath, 'autoflow.config.json');
-                if (fs.existsSync(configPath)) {
+                let hasConfig = false;
+                try {
+                    await fs.promises.access(configPath, fs.constants.F_OK);
+                    hasConfig = true;
+                } catch {}
+
+                if (hasConfig) {
                     try {
                         const content = JSON.parse(await fs.promises.readFile(configPath, 'utf-8'));
                         if (content.projectName) {
@@ -280,4 +308,3 @@ export class ProjectScanner {
 }
 
 export const projectScanner = new ProjectScanner();
-

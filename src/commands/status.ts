@@ -1,7 +1,7 @@
 import { NodeSSH } from 'node-ssh';
 import chalk from 'chalk';
 import log from '../utils/logger';
-import { loadGlobalConfig, loadProjectConfig } from '../utils/config';
+import { loadGlobalConfig, loadProjectConfig } from '../core/config';
 import { escapeShellArg } from '../utils/shell';
 
 async function status(): Promise<void> {

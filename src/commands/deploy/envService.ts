@@ -2,10 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import { NodeSSH } from 'node-ssh';
 import log from '../../utils/logger';
-import { loadVaultConfig, encrypt, verifyOTP, hashPassword } from '../../utils/vaultService';
-import { AutoFlowError, EXIT_CODES, exec } from './errors';
-import inquirer from 'inquirer';
-import { vaultEngine } from '../../core/vault';
+import { loadVaultConfig, vaultEngine } from '../../core/vault';
+import { AutoFlowError, EXIT_CODES } from './errors';
 import { escapeShellArg } from '../../utils/shell';
 
 /**

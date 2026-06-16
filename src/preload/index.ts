@@ -84,8 +84,9 @@ export interface AutoflowApi {
     // CLI Integration
     installCli: () => Promise<{ success: boolean; message?: string; error?: string }>;
 
-    // Generic IPC Invoke
-    invoke: (channel: string, ...args: any[]) => Promise<any>;
+    // Secure Vault Writes
+    saveSshPassword: (password: string) => Promise<{ success: boolean; error?: string }>;
+    saveGitPat: (projectName: string, pat: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 const api: AutoflowApi = {
@@ -202,8 +203,9 @@ const api: AutoflowApi = {
     // CLI Integration
     installCli: () => ipcRenderer.invoke('install-cli'),
 
-    // Generic IPC Invoke
-    invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args)
+    // Secure Vault Writes
+    saveSshPassword: (password) => ipcRenderer.invoke('vault:save-ssh-password', password),
+    saveGitPat: (projectName, pat) => ipcRenderer.invoke('vault:save-git-pat', projectName, pat)
 };
 
 contextBridge.exposeInMainWorld('autoflow', api);

@@ -6,8 +6,8 @@ import crypto from 'crypto';
 import speakeasy from 'speakeasy';
 import qrcode from 'qrcode-terminal';
 import log from '../utils/logger';
-import { saveGlobalConfig, GlobalConfig } from '../utils/config';
-import { saveVaultConfig, hashPassword, loadVaultConfig } from '../utils/vaultService';
+import { saveGlobalConfig, GlobalConfig } from '../core/config';
+import { saveVaultConfig, hashPassword, loadVaultConfig, encryptWithPassword, decryptWithPassword, deleteVault, verifyOTP } from '../core/vault';
 
 async function setup(): Promise<void> {
     log.header('AUTOFLOW GLOBAL CONFIGURATION');
@@ -53,6 +53,12 @@ async function setup(): Promise<void> {
             validate: (val: string) =>
                 fs.existsSync(val) ? true : `File not found at: ${val}`,
         },
+        {
+            type: 'input',
+            name: 'workspacePath',
+            message: 'Workspace Directory Path:',
+            default: existingConfig.workspacePath || path.resolve(process.cwd(), '..'),
+        },
     ]);
 
     saveGlobalConfig(answers);
@@ -83,35 +89,46 @@ async function setup(): Promise<void> {
         }
 
         if (vaultAction === 'change_password') {
+            const { currentPassword } = await inquirer.prompt([{
+                type: 'password',
+                name: 'currentPassword',
+                message: 'Enter Current Master Password:',
+                mask: '*'
+            }]);
+
             const { token } = await inquirer.prompt([{
                 type: 'input',
                 name: 'token',
                 message: 'Confirm identity with 6-digit OTP:',
             }]);
 
-            if (speakeasy.totp.verify({
-                secret: existingVault.totpSecret,
-                encoding: 'base32',
-                token
-            })) {
-                const { newPassword } = await inquirer.prompt([{
-                    type: 'password',
-                    name: 'newPassword',
-                    message: 'Enter New Master Password:',
-                    mask: '*'
-                }]);
-                const salt = crypto.randomBytes(16).toString('hex');
-                saveVaultConfig({
-                    ...existingVault,
-                    passwordHash: hashPassword(newPassword, salt),
-                    salt: salt
-                });
-                log.success('✔ Master password updated successfully!');
-                return;
-            } else {
-                log.error('✘ OTP Verification failed.');
+            let decryptedSecret = '';
+            try {
+                decryptedSecret = decryptWithPassword(existingVault.totpSecret, currentPassword);
+                const verified = verifyOTP(token, decryptedSecret);
+                if (!verified) throw new Error('Invalid OTP');
+            } catch (err) {
+                log.error('✘ Verification failed. Invalid password or OTP.');
                 return;
             }
+
+            const { newPassword } = await inquirer.prompt([{
+                type: 'password',
+                name: 'newPassword',
+                message: 'Enter New Master Password:',
+                mask: '*'
+            }]);
+
+            const salt = crypto.randomBytes(16).toString('hex');
+            const encryptedSecret = encryptWithPassword(decryptedSecret, newPassword);
+            saveVaultConfig({
+                ...existingVault,
+                passwordHash: hashPassword(newPassword, salt),
+                totpSecret: encryptedSecret,
+                salt: salt
+            });
+            log.success('✔ Master password updated successfully!');
+            return;
         }
 
         if (vaultAction === 'reset') {
@@ -122,7 +139,7 @@ async function setup(): Promise<void> {
                 default: false
             }]);
             if (confirmReset) {
-                const { deleteVault } = require('../utils/vaultService');
+                // deleteVault is already imported from ../core/vault
                 deleteVault();
                 log.info('Vault deleted. Starting fresh setup...');
             } else {
@@ -168,9 +185,10 @@ async function setup(): Promise<void> {
 
         if (verified) {
             const salt = crypto.randomBytes(16).toString('hex');
+            const encryptedSecret = encryptWithPassword(secret.base32, password);
             saveVaultConfig({
                 passwordHash: hashPassword(password, salt),
-                totpSecret: secret.base32,
+                totpSecret: encryptedSecret,
                 salt: salt
             });
             log.success('✔ Z+ Security Vault established!');

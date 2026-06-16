@@ -1,4 +1,4 @@
-import { execSync } from 'child_process';
+import { exec, execSync, execFile } from 'child_process';
 import fs from 'fs';
 import https from 'https';
 import path from 'path';
@@ -336,8 +336,22 @@ function getGitHubCheckRuns(owner: string, repo: string, sha: string): Promise<G
 }
 
 
+async function runWithLimit<T>(tasks: (() => Promise<T>)[], limit: number): Promise<T[]> {
+    const results: T[] = new Array(tasks.length);
+    let index = 0;
+    async function runWorker() {
+        while (index < tasks.length) {
+            const currentIndex = index++;
+            results[currentIndex] = await tasks[currentIndex]();
+        }
+    }
+    const workers = Array.from({ length: Math.min(limit, tasks.length) }, runWorker);
+    await Promise.all(workers);
+    return results;
+}
+
 // ── PHP checks ───────────────────────────────────────────────────────────────
-function runPhpChecks(projectDir: string): void {
+async function runPhpChecks(projectDir: string): Promise<void> {
     log.info('PHP project detected. Running PHP CI checks...\n');
 
     const cwd = projectDir;
@@ -358,9 +372,15 @@ function runPhpChecks(projectDir: string): void {
     }
 
     // 3. PHP lint (syntax check) — cross-platform, runs only if php is available locally
+    let phpAvailable = false;
     try {
-        const { execSync: exec } = require('child_process');
-        // Cross-platform recursive PHP file finder using Node.js fs
+        execSync('php -v', { stdio: 'ignore' });
+        phpAvailable = true;
+    } catch {
+        log.warning('  ⚠️  php not found locally — skipping syntax check (it will run on GitHub Actions).');
+    }
+
+    if (phpAvailable) {
         const phpFiles: string[] = [];
         const walk = (dir: string) => {
             for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -374,17 +394,37 @@ function runPhpChecks(projectDir: string): void {
                 }
             }
         };
-        walk(cwd);
-
-        let lintFailed = false;
-        for (const file of phpFiles) {
-            try { exec(`php -l "${file}"`, { cwd, stdio: 'pipe', encoding: 'utf-8' }); }
-            catch { log.error(`  ✘ PHP syntax error in: ${file}`); lintFailed = true; }
+        try {
+            walk(cwd);
+        } catch (walkErr) {
+            log.error(`Failed to walk directories for PHP files: ${walkErr instanceof Error ? walkErr.message : String(walkErr)}`);
+            failed = true;
         }
-        if (!lintFailed) log.success(`  ✔ PHP syntax check passed (${phpFiles.length} file(s))`);
-        else failed = true;
-    } catch {
-        log.warning('  ⚠️  php not found locally — skipping syntax check (it will run on GitHub Actions).');
+
+        if (phpFiles.length > 0 && !failed) {
+            const lintTasks = phpFiles.map(file => {
+                return async (): Promise<boolean> => {
+                    return new Promise((resolve) => {
+                        execFile('php', ['-l', file], { cwd }, (error) => {
+                            if (error) {
+                                log.error(`  ✘ PHP syntax error in: ${file}`);
+                                resolve(false);
+                            } else {
+                                resolve(true);
+                            }
+                        });
+                    });
+                };
+            });
+
+            const results = await runWithLimit(lintTasks, 4);
+            const lintFailed = results.some(passed => !passed);
+            if (!lintFailed) {
+                log.success(`  ✔ PHP syntax check passed (${phpFiles.length} file(s))`);
+            } else {
+                failed = true;
+            }
+        }
     }
 
     if (failed) {
@@ -518,7 +558,7 @@ export async function runCIChecks(projectDir: string, appType: string, strictCI?
             return;
 
         case 'php':
-            runPhpChecks(projectDir);
+            await runPhpChecks(projectDir);
             return;
 
         case 'django':

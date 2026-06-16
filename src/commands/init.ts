@@ -1,11 +1,10 @@
 import inquirer from 'inquirer';
 import fs from 'fs';
 import log from '../utils/logger';
-import { saveProjectConfig, loadGlobalConfig } from '../utils/config';
+import { saveProjectConfig, loadGlobalConfig } from '../core/config';
 import path from 'path';
 import { execSync, spawnSync } from 'child_process';
-import { loadVaultConfig, saveVaultConfig } from '../utils/vaultService';
-import { vaultEngine } from '../core/vault';
+import { loadVaultConfig, saveVaultConfig, vaultEngine } from '../core/vault';
 
 async function init(): Promise<void> {
   log.header('AUTOFLOW INITIALIZATION');

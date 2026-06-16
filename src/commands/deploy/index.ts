@@ -14,7 +14,7 @@ import { configureNginx } from './nginxService';
 import { provisionSSL } from './sslService';
 import { configureUFW } from './ufwService';
 import { syncEnv, unlockEnvOnServer, cleanupEnv } from './envService';
-import { loadVaultConfig } from '../../utils/vaultService';
+import { loadVaultConfig } from '../../core/vault';
 import { vaultEngine } from '../../core/vault';
 import { AutoFlowError, EXIT_CODES, unregisterCleanupHandlers } from './errors';
 import inquirer from 'inquirer';
@@ -26,11 +26,46 @@ import os from 'os';
 const LOCK_FILE = path.join(os.homedir(), '.autoflow', 'jobs', 'deploy.lock');
 
 async function deploy(isDesktop: boolean = false, projectDir: string = process.cwd()): Promise<void> {
-    if (fs.existsSync(LOCK_FILE)) {
-        throw new AutoFlowError('Another deployment is already in progress.', EXIT_CODES.CI_FAILED, 'deploy');
+    let lockFd: number | null = null;
+    let acquired = false;
+    let attempts = 0;
+    while (!acquired && attempts < 2) {
+        attempts++;
+        try {
+            fs.mkdirSync(path.dirname(LOCK_FILE), { recursive: true });
+            lockFd = fs.openSync(LOCK_FILE, 'wx');
+            fs.writeFileSync(lockFd, process.pid.toString(), 'utf-8');
+            acquired = true;
+        } catch (err) {
+            if (fs.existsSync(LOCK_FILE)) {
+                try {
+                    const content = fs.readFileSync(LOCK_FILE, 'utf-8').trim();
+                    const pid = parseInt(content, 10);
+                    let processRunning = false;
+                    if (!isNaN(pid)) {
+                        try {
+                            process.kill(pid, 0);
+                            processRunning = true;
+                        } catch (killErr: any) {
+                            processRunning = killErr.code !== 'ESRCH';
+                        }
+                    }
+                    if (!processRunning) {
+                        try { fs.unlinkSync(LOCK_FILE); } catch {}
+                        continue;
+                    }
+                } catch (readErr) {
+                    try { fs.unlinkSync(LOCK_FILE); } catch {}
+                    continue;
+                }
+            }
+            throw new AutoFlowError('Another deployment is already in progress.', EXIT_CODES.CI_FAILED, 'deploy');
+        } finally {
+            if (lockFd !== null) {
+                try { fs.closeSync(lockFd); } catch {}
+            }
+        }
     }
-    fs.mkdirSync(path.dirname(LOCK_FILE), { recursive: true });
-    fs.writeFileSync(LOCK_FILE, Date.now().toString());
 
     // Top-level catch — ensures NO raw stack traces ever reach the user
     try {
@@ -81,7 +116,7 @@ async function deploy(isDesktop: boolean = false, projectDir: string = process.c
         await runCIChecks(projectDir, config.appType, config.strictCI);
 
         // ── Step 3: Git sync (local → remote repo) ───────────────────────────
-        const sha = await syncLocalGit(projectDir);
+        const sha = await syncLocalGit(projectDir, config.branch);
 
         // ── Step 4: Remote CI Checks (GitHub Actions) ───────────────────────
         await waitForRemoteCI(config.gitRepo, sha, config.strictCI);
