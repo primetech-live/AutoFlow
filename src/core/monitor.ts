@@ -138,26 +138,7 @@ export class MonitorEngine {
                     }
                 }
 
-                // Fallback 2: Systemd active services list
-                if (containers.length === 0) {
-                    const systemdRaw = await connectionManager.safeRun("systemctl list-units --type=service --state=running --no-legend --no-pager | head -n 10");
-                    if (systemdRaw) {
-                        const rows = systemdRaw.trim().split('\n').filter(Boolean);
-                        for (const row of rows) {
-                            const parts = row.split(/\s+/).filter(Boolean);
-                            if (parts.length >= 4) {
-                                const name = parts[0];
-                                const activeState = parts[3]; // e.g. running
-                                containers.push({
-                                    name: `[systemd] ${name}`,
-                                    status: activeState,
-                                    cpu: 'N/A',
-                                    mem: 'N/A'
-                                });
-                            }
-                        }
-                    }
-                }
+                // Fallback 2: Systemd active services list (Removed to prevent showing OS-level services)
             }
 
             return {

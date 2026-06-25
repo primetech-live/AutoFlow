@@ -1,5 +1,11 @@
 /// <reference types="vite/client" />
 import React, { useState } from "react";
+
+declare global {
+  interface Window {
+    autoflow: any;
+  }
+}
 import { WarningIcon } from "../components/Icons";
 import appIcon from "../../assets/icon-1.png";
 import darkBg from "../../assets/dark_bg.png";
