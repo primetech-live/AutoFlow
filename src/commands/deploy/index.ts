@@ -71,7 +71,8 @@ async function deploy(isDesktop: boolean = false, projectDir: string = process.c
     try {
         // ── Step 1: Load config ──────────────────────────────────────────────
         log.header('AUTOFLOW DEPLOY');
-        const config = loadConfig(projectDir);
+        const dir = typeof projectDir === 'string' ? projectDir : process.cwd();
+        const config = loadConfig(dir);
 
         const remoteProjectDir = `/home/${config.sshUser}/apps/${config.projectName}`;
         const image = `${config.projectName}:latest`;
@@ -201,6 +202,7 @@ async function deploy(isDesktop: boolean = false, projectDir: string = process.c
                     unregisterCleanupHandlers(ssh);
                     ssh.dispose();
                 } catch {}
+                process.exit(0); // Ensure process terminates instantly in CLI mode
             }
         }
 

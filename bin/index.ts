@@ -53,7 +53,7 @@ program
 program
     .command('deploy')
     .description('Deploy the current project to the remote server')
-    .action(deploy);
+    .action(() => deploy(false));
 
 program
     .command('status')
