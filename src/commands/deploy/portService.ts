@@ -4,15 +4,16 @@ import { AutoFlowError, EXIT_CODES } from './errors';
 import { escapeShellArg } from '../../utils/shell';
 
 export async function allocatePort(ssh: NodeSSH, containerName: string): Promise<string> {
-    // 1. Try to reuse existing port if container is already running
+
+    // 1. Try to reuse existing port if container is already running (creates downtime)
     const currentMapping = await ssh.execCommand(
-        `docker ps --filter ${escapeShellArg(`name=${containerName}`)} --format "{{.Ports}}"`
+        `docker ps --filter ${escapeShellArg(`name=^/${containerName}$`)} --format "{{.Ports}}"`
     );
 
     if (currentMapping.stdout) {
         const match = currentMapping.stdout.match(/:(\d+)->/);
         if (match && match[1]) {
-            log.info(`Reusing existing port: ${match[1]}`);
+            log.info(`Reusing existing port: ${match[1]} (causes brief downtime)`);
             return match[1];
         }
     }

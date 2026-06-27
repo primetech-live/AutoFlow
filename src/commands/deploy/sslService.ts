@@ -22,7 +22,7 @@ export async function provisionSSL(
 
     // DNS pre-validation
     log.info(`Verifying DNS resolution for ${domain}...`);
-    const dnsCheck = await ssh.execCommand(`ping -c 1 ${safeDomain}`);
+    const dnsCheck = await ssh.execCommand(`getent hosts ${safeDomain}`);
     if (dnsCheck.code !== 0) {
         log.warning(`⚠️  DNS resolution failed for ${domain}. Skipping SSL setup to prevent Let's Encrypt rate limits.`);
         return;

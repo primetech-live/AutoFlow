@@ -79,7 +79,7 @@ export async function verifyContainerHealth(
     while (attempts < maxAttempts) {
         attempts++;
         const ps = await ssh.execCommand(
-            `docker ps --filter "name=${escapeShellArg(containerName)}" --format "{{.Status}}"`
+            `docker ps --filter ${escapeShellArg(`name=^/${containerName}$`)} --format "{{.Status}}"`
         );
 
         if (ps.stdout && ps.stdout.includes('Up')) {
@@ -95,9 +95,9 @@ export async function verifyContainerHealth(
 
     if (!isHealthy) {
         const logs = await ssh.execCommand(`docker logs --tail 25 ${escapeShellArg(containerName)}`);
-        console.log(chalk.red('\n=== CONTAINER LOGS (last 25 lines) ==='));
-        console.log(chalk.red(logs.stdout || logs.stderr));
-        console.log(chalk.red('======================================\n'));
+        log.error('\n=== CONTAINER LOGS (last 25 lines) ===');
+        log.error(logs.stdout || logs.stderr);
+        log.error('======================================\n');
 
         throw new AutoFlowError(
             `Container "${containerName}" failed to start or exited immediately.`,

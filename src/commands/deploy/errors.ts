@@ -81,7 +81,7 @@ export async function exec(
         const sanitizedCommand = command.replace(/GIT_TOKEN='[^']+'/g, "GIT_TOKEN='********'");
         log.error(`Command failed: ${sanitizedCommand.trim().slice(0, 120)}`);
         if (errorOutput) console.error(errorOutput);
-        throw new AutoFlowError(`Remote command failed`, EXIT_CODES.UNKNOWN, sanitizedCommand);
+        throw new AutoFlowError(`Remote command failed:\n${errorOutput}`, EXIT_CODES.UNKNOWN, sanitizedCommand);
     }
     return result;
 }

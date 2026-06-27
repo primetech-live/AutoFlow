@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { CloseIcon, SuccessIcon, WarningIcon } from './Icons';
 
 interface DeployLog {
@@ -22,6 +22,7 @@ export const DeployProgressModal: React.FC<DeployProgressModalProps> = ({ active
     const terminalRef = useRef<HTMLDivElement>(null);
     const xtermRef = useRef<any>(null);
     const lastLogCountRef = useRef(0);
+    const [copied, setCopied] = useState(false);
 
     // Reset log counter whenever a new deployment starts (logs array resets to 1 item)
     useEffect(() => {
@@ -199,7 +200,19 @@ export const DeployProgressModal: React.FC<DeployProgressModalProps> = ({ active
                     </div>
 
                     {/* Footer Actions */}
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
+                        <button 
+                            onClick={() => {
+                                const logText = activeDeploy.logs.map(l => l.message).join('\n');
+                                navigator.clipboard.writeText(logText);
+                                setCopied(true);
+                                setTimeout(() => setCopied(false), 2000);
+                            }} 
+                            className="btn btn-secondary" 
+                            style={{ padding: '8px 24px' }}
+                        >
+                            {copied ? 'Copied!' : 'Copy Logs'}
+                        </button>
                         {!isRunning && (
                             <button onClick={onClose} className="btn btn-primary" style={{ padding: '8px 24px' }}>
                                 Close

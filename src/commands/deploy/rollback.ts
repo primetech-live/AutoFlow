@@ -22,10 +22,13 @@ export async function backupContainer(ssh: NodeSSH, containerName: string): Prom
     // Remove any old rollback container first
     await ssh.execCommand(`docker rm -f ${escapeShellArg(rollbackName)} || true`);
 
-    // Rename current container to the rollback slot (kept running for zero-downtime)
+    // Rename current container to the rollback slot
     await ssh.execCommand(`docker rename ${escapeShellArg(containerName)} ${escapeShellArg(rollbackName)}`);
+    
+    // Stop the rollback container so its port is released for the new container
+    await ssh.execCommand(`docker stop ${escapeShellArg(rollbackName)}`);
 
-    log.success(`Rollback snapshot ready (live): "${rollbackName}" ✔`);
+    log.success(`Rollback snapshot ready (stopped): "${rollbackName}" ✔`);
 }
 
 export async function confirmDeploy(ssh: NodeSSH, containerName: string): Promise<void> {

@@ -69,9 +69,9 @@ export class InstallerEngine {
         if (depsToInstall.includes('Docker')) {
             onProgress('Installing Docker...');
             if (pkgManager === 'apt' || pkgManager === 'yum') {
-                await connectionManager.execCommand('curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh');
+                await connectionManager.execCommand('curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh && sudo usermod -aG docker $USER');
             } else if (pkgManager === 'apk') {
-                await connectionManager.execCommand('sudo apk add docker && sudo rc-update add docker boot && sudo service docker start');
+                await connectionManager.execCommand('sudo apk add docker && sudo rc-update add docker boot && sudo service docker start && sudo addgroup $USER docker');
             }
         }
 
