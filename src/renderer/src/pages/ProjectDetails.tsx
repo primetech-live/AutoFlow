@@ -147,6 +147,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
     // Overview config states
     const [projectName, setProjectName] = useState(project.projectName);
     const [gitRepo, setGitRepo] = useState(project.gitRepo);
+    const [branch, setBranch] = useState((project as any).branch || 'main');
     const [domain, setDomain] = useState('');
     const [appType, setAppType] = useState(project.appType || 'node');
     const [strictCI, setStrictCI] = useState(false);
@@ -177,6 +178,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                     const config = await window.autoflow.loadProjectConfig(project.projectPath);
                     setProjectName(config.projectName || project.projectName);
                     setGitRepo(config.gitRepo || project.gitRepo);
+                    setBranch(config.branch || 'main');
                     setDomain(config.domain || '');
                     setAppType(config.appType || 'node');
                     setStrictCI(!!config.strictCI);
@@ -212,7 +214,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
         loadConfig();
         loadEnv();
         fetchHistory();
-    }, [project, activeDeploy]);
+    }, [project]);
 
     const handleSaveConfig = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -225,6 +227,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                 await window.autoflow.initProject(project.projectPath, {
                     projectName,
                     gitRepo,
+                    branch,
                     domain: domain || undefined,
                     strictCI
                 });
@@ -233,6 +236,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                 await window.autoflow.saveProjectConfig(project.projectPath, {
                     projectName,
                     gitRepo,
+                    branch,
                     domain: domain || undefined,
                     appType,
                     deploymentType: appType === 'static' ? 'static' : 'docker',
@@ -558,6 +562,18 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                                     className="input"
                                     value={gitRepo}
                                     onChange={(e) => setGitRepo(e.target.value)}
+                                />
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-label">Git Branch</label>
+                                <input
+                                    type="text"
+                                    required
+                                    placeholder="main"
+                                    className="input"
+                                    value={branch}
+                                    onChange={(e) => setBranch(e.target.value)}
                                 />
                             </div>
 

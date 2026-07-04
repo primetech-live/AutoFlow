@@ -52,13 +52,10 @@ async function stop(isDesktop: boolean = false, projectDir: string = process.cwd
         log.info('Pruning unused Docker builder images...');
         await execSafe(ssh, 'docker image prune -f');
 
-        // 3. Remove Nginx config
-        log.info('Disabling Nginx config...');
-        await execSafe(ssh, `sudo rm -f /etc/nginx/sites-enabled/${safeProjectName}`);
-
-        // 4. Reload Nginx
-        log.info('Reloading Nginx...');
-        await execSafe(ssh, 'sudo nginx -s reload');
+        // 3. Nginx configuration is intentionally preserved.
+        // This maintains domain ownership and prevents the routing from falling back
+        // to a default server block while the container is offline.
+        log.info('Nginx routing preserved (domain ownership maintained).');
 
         log.success('Service stopped successfully ✅');
         log.info('To redeploy, run: autoflow deploy');

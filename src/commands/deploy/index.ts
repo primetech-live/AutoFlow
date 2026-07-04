@@ -68,6 +68,7 @@ async function deploy(isDesktop: boolean = false, projectDir: string = process.c
     }
 
     // Top-level catch — ensures NO raw stack traces ever reach the user
+    let fatalErr: unknown = null;
     try {
         // ── Step 1: Load config ──────────────────────────────────────────────
         log.header('AUTOFLOW DEPLOY');
@@ -196,24 +197,32 @@ async function deploy(isDesktop: boolean = false, projectDir: string = process.c
             log.header('DEPLOYMENT COMPLETE 🚀');
 
         } finally {
-            // SSH is ALWAYS cleaned up for CLI
-            if (!isDesktop) {
-                try {
-                    unregisterCleanupHandlers(ssh);
-                    ssh.dispose();
-                } catch {}
-                process.exit(0); // Ensure process terminates instantly in CLI mode
-            }
+            try {
+                unregisterCleanupHandlers(ssh);
+                ssh.dispose();
+            } catch {}
         }
 
     } catch (err: unknown) {
-        if (isDesktop) {
-            throw err;
-        }
-        // Single unified error handler — formats every error cleanly, no stack traces
-        handleFatalError(err);
+        fatalErr = err;
     } finally {
-        if (fs.existsSync(LOCK_FILE)) fs.unlinkSync(LOCK_FILE);
+        // Lock file is ALWAYS cleaned up before process.exit
+        if (fs.existsSync(LOCK_FILE)) {
+            try { fs.unlinkSync(LOCK_FILE); } catch {}
+        }
+    }
+
+    if (fatalErr) {
+        if (isDesktop) throw fatalErr;
+        // Single unified error handler — formats every error cleanly, no stack traces
+        handleFatalError(fatalErr);
+    }
+
+    if (!isDesktop) {
+        // Diagnostic logs for Issue 3 terminal hang investigation
+        log.info(`[Diagnostic] Reached absolute end of deploy execution. isDesktop=${isDesktop}`);
+        log.info('[Diagnostic] Calling process.exit(0) now...');
+        process.exit(0); // Ensure process terminates instantly in CLI mode
     }
 }
 

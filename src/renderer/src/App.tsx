@@ -660,6 +660,7 @@ const App: React.FC = () => {
 
                     {activePage === 'project-details' && selectedProject && (
                         <ProjectDetails
+                            key={selectedProject.projectPath || selectedProject.projectName}
                             project={projects.find(p => p.projectName === selectedProject.projectName) || selectedProject}
                             initialTab={detailTab}
                             onBack={() => { setActivePage('dashboard'); setSelectedProject(null); }}
