@@ -199,6 +199,11 @@ async function deploy(isDesktop: boolean = false, projectDir: string = process.c
         } finally {
             try {
                 unregisterCleanupHandlers(ssh);
+                // Forcibly destroy the underlying socket to prevent node-ssh from hanging indefinitely 
+                // if a stream was left open by the server.
+                if ((ssh as any).connection) {
+                    (ssh as any).connection.destroy();
+                }
                 ssh.dispose();
             } catch {}
         }

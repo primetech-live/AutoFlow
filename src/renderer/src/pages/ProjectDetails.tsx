@@ -214,7 +214,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
         loadConfig();
         loadEnv();
         fetchHistory();
-    }, [project]);
+    }, [project.projectPath, project.projectName, project.isExternal]);
 
     const handleSaveConfig = async (e: React.FormEvent) => {
         e.preventDefault();

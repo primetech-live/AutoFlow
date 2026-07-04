@@ -13,6 +13,8 @@ export async function configureNginx(
 ): Promise<void> {
     log.info(`Configuring Nginx for domain: ${domain}`);
 
+    await setupGlobalDefaultServer(ssh);
+
     const nginxConf = `
 server {
     listen 80;
@@ -106,4 +108,75 @@ NGINX_EOF`);
     await ssh.execCommand('sudo setsebool -P httpd_can_network_connect 1 2>/dev/null || true');
 
     log.success('Nginx configured and reloaded ✔');
+}
+
+async function setupGlobalDefaultServer(ssh: NodeSSH): Promise<void> {
+    const catchAllPath = '/etc/nginx/sites-available/000-autoflow-catchall';
+    const checkExists = await ssh.execCommand(`test -f ${catchAllPath} && echo "EXISTS" || echo "MISSING"`);
+    if (checkExists.stdout.trim() === 'EXISTS') {
+        return; // Already configured
+    }
+
+    log.info('Setting up global Nginx catch-all for unmatched domains...');
+
+    // Try modern approach first (Nginx 1.19.4+)
+    const modernConf = `server {
+    listen 80 default_server;
+    server_name _;
+    return 444;
+}
+
+server {
+    listen 443 ssl default_server;
+    server_name _;
+    ssl_reject_handshake on;
+}
+`;
+
+    // Fallback approach (Older Nginx)
+    const fallbackConf = `server {
+    listen 80 default_server;
+    server_name _;
+    return 444;
+}
+
+server {
+    listen 443 ssl default_server;
+    server_name _;
+    ssl_certificate /etc/ssl/certs/ssl-cert-snakeoil.pem;
+    ssl_certificate_key /etc/ssl/private/ssl-cert-snakeoil.key;
+    return 444;
+}
+`;
+
+    // Remove default nginx config to prevent conflicts
+    await ssh.execCommand('sudo rm -f /etc/nginx/sites-enabled/default');
+
+    // Attempt modern config
+    await ssh.execCommand(`cat <<'NGINX_EOF' | sudo tee ${catchAllPath} > /dev/null\n${modernConf}\nNGINX_EOF`);
+    await ssh.execCommand(`sudo ln -sf ${catchAllPath} /etc/nginx/sites-enabled/000-autoflow-catchall`);
+
+    const testModern = await ssh.execCommand('sudo nginx -t 2>&1');
+    
+    if (testModern.code !== 0) {
+        log.info('Older Nginx version detected. Using legacy catch-all configuration...');
+        
+        // Ensure ssl-cert package exists for snakeoil certs
+        const checkSslCert = await ssh.execCommand('dpkg -l | grep -q ssl-cert || echo "MISSING"');
+        if (checkSslCert.stdout.trim() === 'MISSING') {
+            await ssh.execCommand('sudo apt-get update && sudo apt-get install -y ssl-cert', { execOptions: { pty: false } } as object);
+        }
+        await ssh.execCommand('sudo make-ssl-cert generate-default-snakeoil --force-overwrite || true');
+
+        // Apply fallback config
+        await ssh.execCommand(`cat <<'NGINX_EOF' | sudo tee ${catchAllPath} > /dev/null\n${fallbackConf}\nNGINX_EOF`);
+        const testFallback = await ssh.execCommand('sudo nginx -t 2>&1');
+        
+        if (testFallback.code !== 0) {
+            log.warning('Failed to configure global Nginx catch-all. Reverting to avoid downtime.');
+            await ssh.execCommand(`sudo rm -f /etc/nginx/sites-enabled/000-autoflow-catchall`);
+        }
+    }
+    
+    await ssh.execCommand('sudo systemctl reload nginx || true');
 }
