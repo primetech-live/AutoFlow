@@ -87,6 +87,13 @@ export interface AutoflowApi {
     // Secure Vault Writes
     saveSshPassword: (password: string) => Promise<{ success: boolean; error?: string }>;
     saveGitPat: (projectName: string, pat: string) => Promise<{ success: boolean; error?: string }>;
+
+    // Auth sync
+    syncAuthSession: (session: any) => Promise<void>;
+    clearAuthSession: () => Promise<void>;
+    getUserProfile: () => Promise<any>;
+    onAuthDeepLink: (callback: (url: string) => void) => () => void;
+    openExternal: (url: string) => Promise<void>;
 }
 
 const api: AutoflowApi = {
@@ -205,7 +212,18 @@ const api: AutoflowApi = {
 
     // Secure Vault Writes
     saveSshPassword: (password) => ipcRenderer.invoke('vault:save-ssh-password', password),
-    saveGitPat: (projectName, pat) => ipcRenderer.invoke('vault:save-git-pat', projectName, pat)
+    saveGitPat: (projectName, pat) => ipcRenderer.invoke('vault:save-git-pat', projectName, pat),
+
+    // Auth sync
+    syncAuthSession: (session) => ipcRenderer.invoke('auth:sync-session', session),
+    clearAuthSession: () => ipcRenderer.invoke('auth:clear-session'),
+    getUserProfile: () => ipcRenderer.invoke('auth:get-profile'),
+    onAuthDeepLink: (callback) => {
+        const handler = (_: any, url: string) => callback(url);
+        ipcRenderer.on('auth:deep-link', handler);
+        return () => ipcRenderer.removeListener('auth:deep-link', handler);
+    },
+    openExternal: (url) => ipcRenderer.invoke('window:open-external', url)
 };
 
 contextBridge.exposeInMainWorld('autoflow', api);

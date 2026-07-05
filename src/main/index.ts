@@ -10,6 +10,21 @@ import { globalConfigExists, loadGlobalConfig } from '../core/config';
 let mainWindow: BrowserWindow | null = null;
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
+// Force single instance and register protocol
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+    app.quit();
+    process.exit(0);
+}
+
+if (process.defaultApp) {
+    if (process.argv.length >= 2) {
+        app.setAsDefaultProtocolClient('autoflow', process.execPath, [path.resolve(process.argv[1])]);
+    }
+} else {
+    app.setAsDefaultProtocolClient('autoflow');
+}
+
 function createWindow() {
     mainWindow = new BrowserWindow({
         width: 1200,
@@ -93,6 +108,22 @@ app.whenReady().then(async () => {
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {
             createWindow();
+        }
+    });
+
+    app.on('second-instance', (_, commandLine) => {
+        if (mainWindow) {
+            if (mainWindow.isMinimized()) mainWindow.restore();
+            mainWindow.focus();
+            const url = commandLine.find(arg => arg.startsWith('autoflow://'));
+            if (url) mainWindow.webContents.send('auth:deep-link', url);
+        }
+    });
+
+    app.on('open-url', (event, url) => {
+        event.preventDefault();
+        if (mainWindow) {
+            mainWindow.webContents.send('auth:deep-link', url);
         }
     });
 

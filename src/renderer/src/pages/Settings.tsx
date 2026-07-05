@@ -39,6 +39,9 @@ export const Settings: React.FC<SettingsProps> = ({ onReRunOnboarding, onResetCo
     const [cliStatus, setCliStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
     const [installingCli, setInstallingCli] = useState(false);
 
+    const [profile, setProfile] = useState<any>(null);
+    const [projectCount, setProjectCount] = useState(0);
+
     // Fetch existing settings on load
     useEffect(() => {
         const fetchConfig = async () => {
@@ -55,6 +58,10 @@ export const Settings: React.FC<SettingsProps> = ({ onReRunOnboarding, onResetCo
             }
         };
         fetchConfig();
+        window.autoflow.getUserProfile().then(setProfile).catch(() => {});
+        window.autoflow.getSavedProjects().then((projects: any[]) => {
+            setProjectCount(projects ? projects.length : 0);
+        }).catch(() => {});
     }, []);
 
     const handleBrowseKey = async () => {
@@ -389,6 +396,36 @@ export const Settings: React.FC<SettingsProps> = ({ onReRunOnboarding, onResetCo
 
                 {/* Right card: System Maintenance & Danger Zone */}
                 <div style={{ flex: 1, minWidth: '300px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    {profile && (
+                        <div className="card" style={{ border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                            <h3 className="h2" style={{ fontSize: '15px', marginBottom: '12px', color: 'var(--accent)' }}>
+                                AutoFlow Credits
+                            </h3>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <span className="text-secondary">Current Plan</span>
+                                    <span style={{ fontWeight: 600, textTransform: 'capitalize' }}>{profile.plan || 'Free'}</span>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <span className="text-secondary">Projects Used</span>
+                                    <span style={{ fontWeight: 600 }}>{projectCount} / 2</span>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <span className="text-secondary">Remaining Projects</span>
+                                    <span style={{ fontWeight: 600 }}>{Math.max(0, 2 - projectCount)}</span>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <span className="text-secondary">Deployments Used</span>
+                                    <span style={{ fontWeight: 600 }}>{profile.deployment_count || 0}</span>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <span className="text-secondary">Remaining Deployments</span>
+                                    <span style={{ fontWeight: 600 }}>{Math.max(0, 20 - (profile.deployment_count || 0))}</span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="card">
                         <h3 className="h2" style={{ fontSize: '15px', marginBottom: '12px' }}>
                             Theme Preference

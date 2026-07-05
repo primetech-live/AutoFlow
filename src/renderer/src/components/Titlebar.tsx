@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { LockIcon } from './Icons';
 import appIcon from '../../assets/icon-1.png';
+
+import { useAuth } from '../core/AuthProvider';
 
 interface TitlebarProps {
     isUnlocked: boolean;
@@ -11,6 +13,31 @@ export const Titlebar: React.FC<TitlebarProps> = ({ isUnlocked, onLockClick }) =
     const handleMinimize = () => window.autoflow.minimize();
     const handleMaximize = () => window.autoflow.maximize();
     const handleClose = () => window.autoflow.close();
+
+    const { user, signOut } = useAuth();
+    const [showPopover, setShowPopover] = useState(false);
+    const [profile, setProfile] = useState<any>(null);
+    const [projectCount, setProjectCount] = useState(0);
+    const popoverRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (user && showPopover && !profile) {
+            window.autoflow.getUserProfile().then(setProfile);
+            window.autoflow.getSavedProjects().then((projects: any[]) => {
+                setProjectCount(projects ? projects.length : 0);
+            });
+        }
+    }, [user, showPopover, profile]);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (popoverRef.current && !popoverRef.current.contains(event.target as Node)) {
+                setShowPopover(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     return (
         <div className="titlebar">
@@ -44,6 +71,65 @@ export const Titlebar: React.FC<TitlebarProps> = ({ isUnlocked, onLockClick }) =
                     </div>
                 )}
                 
+                {user && (
+                    <div className="no-drag" style={{ position: 'relative', display: 'flex', alignItems: 'center', marginRight: '16px' }} ref={popoverRef}>
+                        <span style={{ marginRight: '12px', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)' }}>
+                            Welcome, <span style={{ color: 'var(--text-primary)' }}>{user.user_metadata?.full_name?.split(' ')[0] || 'User'}</span>
+                        </span>
+                        <div 
+                            onClick={() => setShowPopover(!showPopover)}
+                            style={{
+                                width: '28px', height: '28px', borderRadius: '50%', overflow: 'hidden', cursor: 'pointer',
+                                border: '1px solid var(--border-color)'
+                            }}
+                        >
+                            <img src={user.user_metadata?.avatar_url || 'https://www.gravatar.com/avatar/?d=mp'} alt="Avatar" style={{ width: '100%', height: '100%' }} />
+                        </div>
+                        
+                        {showPopover && (
+                            <div style={{
+                                position: 'absolute', top: '100%', right: '0', marginTop: '8px', width: '260px',
+                                background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '8px',
+                                padding: '16px', zIndex: 1000, boxShadow: '0 4px 12px rgba(0,0,0,0.5)'
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                                    <img src={user.user_metadata?.avatar_url || 'https://www.gravatar.com/avatar/?d=mp'} alt="Avatar" style={{ width: '40px', height: '40px', borderRadius: '50%' }} />
+                                    <div style={{ overflow: 'hidden' }}>
+                                        <div style={{ fontWeight: 600, fontSize: '14px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                            {user.user_metadata?.full_name || 'User'}
+                                        </div>
+                                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                            {user.email}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style={{ background: 'var(--bg-main)', padding: '10px', borderRadius: '6px', marginBottom: '16px', fontSize: '13px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                        <span style={{ color: 'var(--text-secondary)' }}>Current Plan</span>
+                                        <span style={{ fontWeight: 600, textTransform: 'capitalize' }}>{profile?.plan || 'Free'}</span>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                        <span style={{ color: 'var(--text-secondary)' }}>Projects</span>
+                                        <span style={{ fontWeight: 600 }}>{projectCount} / 2</span>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <span style={{ color: 'var(--text-secondary)' }}>Deployments</span>
+                                        <span style={{ fontWeight: 600 }}>{profile?.deployment_count || 0}</span>
+                                    </div>
+                                </div>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <button className="btn btn-primary" style={{ flex: 1, padding: '8px', fontSize: '12px' }}>
+                                        Upgrade
+                                    </button>
+                                    <button onClick={signOut} className="btn btn-secondary" style={{ flex: 1, padding: '8px', fontSize: '12px' }}>
+                                        Sign Out
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 <div className="no-drag" style={{ display: 'flex', height: '100%' }}>
                     <button onClick={handleMinimize} className="win-btn" title="Minimize">
                         <svg width="10.2" height="1" viewBox="0 0 10.2 1"><rect x="0" y="0" width="10.2" height="1" fill="currentColor"/></svg>

@@ -35,6 +35,7 @@ import { connectionManager } from '../core/connection';
 import { installerEngine } from '../core/installer';
 import { addLogListener, removeLogListener, LogType } from '../utils/logger';
 import { installGlobalCli } from './cliInstaller';
+import { supabase, setAuthSession, clearAuthSession, getCurrentUserId } from './supabase';
 
 export function registerIpcHandlers(mainWindow: BrowserWindow) {
     // Window Controls
@@ -150,6 +151,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
         }
     });
 
+    // Secure Vault Writes
     ipcMain.handle('vault:save-ssh-password', (_, password) => {
         if (!vaultEngine.isUnlocked()) return { success: false, error: 'Vault is locked' };
         try {
@@ -161,6 +163,44 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
         } catch (e: any) {
             return { success: false, error: e.message };
         }
+    });
+
+    // Auth sync
+    ipcMain.handle('auth:sync-session', async (_, session) => {
+        await setAuthSession(session);
+        const userId = getCurrentUserId();
+        if (userId) {
+            const projects = loadSavedProjects();
+            let deploymentCount = 0;
+            for (const p of projects) {
+                let pName = path.basename(p);
+                try {
+                    const cfg = loadProjectConfig(p);
+                    if (cfg.projectName) pName = cfg.projectName;
+                } catch { }
+                deploymentCount += (deployerEngine.getHistory(pName) || []).length;
+            }
+            await supabase.from('user_profiles').update({ 
+                project_count: projects.length,
+                deployment_count: deploymentCount
+            }).eq('id', userId);
+        }
+    });
+
+    ipcMain.handle('auth:clear-session', async () => {
+        await clearAuthSession();
+        vaultEngine.lock();
+    });
+
+    ipcMain.handle('auth:get-profile', async () => {
+        const userId = getCurrentUserId();
+        if (!userId) return null;
+        const { data } = await supabase.from('user_profiles').select('*').eq('id', userId).single();
+        return data;
+    });
+
+    ipcMain.handle('window:open-external', (_, url) => {
+        require('electron').shell.openExternal(url);
     });
 
     // File Dialog Browser
@@ -280,12 +320,29 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
         return projectsMetadata;
     });
 
-    ipcMain.handle('projects:add', (_, projectPath) => {
+    ipcMain.handle('projects:add', async (_, projectPath) => {
+        const userId = getCurrentUserId();
+        if (userId) {
+            const { data, error } = await supabase.from('user_profiles').select('project_count, plan').eq('id', userId).single();
+            if (data && data.plan === 'free' && data.project_count >= 2) {
+                throw new Error('Free plan limit reached: Maximum 2 projects allowed. Please upgrade.');
+            }
+            if (!error) {
+                await supabase.from('user_profiles').update({ project_count: data.project_count + 1 }).eq('id', userId);
+            }
+        }
         addProjectToSaved(projectPath);
     });
 
-    ipcMain.handle('projects:remove', (_, projectPath) => {
+    ipcMain.handle('projects:remove', async (_, projectPath) => {
         removeProjectFromSaved(projectPath);
+        const userId = getCurrentUserId();
+        if (userId) {
+            const { data } = await supabase.from('user_profiles').select('project_count').eq('id', userId).single();
+            if (data && data.project_count > 0) {
+                await supabase.from('user_profiles').update({ project_count: data.project_count - 1 }).eq('id', userId);
+            }
+        }
     });
 
     ipcMain.handle('projects:load-config', (_, projectPath) => {
@@ -350,6 +407,16 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
             projectName = cfg.projectName || projectName;
         } catch { /* use basename fallback */ }
 
+        // Check limits
+        const userId = getCurrentUserId();
+        if (userId) {
+            const history = deployerEngine.getHistory(projectName) || [];
+            if (history.length >= 20) {
+                if (!mainWindow.isDestroyed()) mainWindow.webContents.send('deploy:failed', { error: 'Free plan limit reached: Maximum 20 deployments per project.' });
+                return { success: false };
+            }
+        }
+
         // Stream every log line straight to the renderer terminal
         const logListener = (type: LogType, message: string) => {
             if (!mainWindow.isDestroyed()) {
@@ -374,6 +441,13 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
                     try { return require('child_process').execSync('git rev-parse --short HEAD', { cwd: projectPath, encoding: 'utf8' }).trim(); } catch { return 'N/A'; }
                 })()
             });
+
+            if (userId) {
+                const { data } = await supabase.from('user_profiles').select('deployment_count').eq('id', userId).single();
+                if (data) {
+                    await supabase.from('user_profiles').update({ deployment_count: data.deployment_count + 1 }).eq('id', userId);
+                }
+            }
 
             if (!mainWindow.isDestroyed()) mainWindow.webContents.send('deploy:success', {});
         } catch (err: any) {
