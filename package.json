@@ -36,7 +36,11 @@
     "nsis": {
       "oneClick": false,
       "perMachine": true,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "license": "build/license.txt",
+      "uninstallDisplayName": "Autoflow-vNext",
+      "installerSidebar": "build/installer-sidebar.bmp",
+      "uninstallerSidebar": "build/installer-sidebar.bmp"
     },
     "mac": {
       "target": [
