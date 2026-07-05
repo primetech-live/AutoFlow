@@ -134,15 +134,15 @@ export const DeployProgressModal: React.FC<DeployProgressModalProps> = ({ active
     } else if (activeDeploy.status === 'failed') {
         progressPct = 100; // Fills up in red
     } else {
-        // Progress based on deployment keywords found in logs
-        if (logText.includes('local ci checks') || logText.includes('ci checks')) progressPct = 10;
-        if (logText.includes('git sync') || logText.includes('pushing')) progressPct = 25;
-        if (logText.includes('remote ci') || logText.includes('github actions')) progressPct = 40;
-        if (logText.includes('ssh connect') || logText.includes('connecting')) progressPct = 50;
-        if (logText.includes('docker build') || logText.includes('building')) progressPct = 65;
-        if (logText.includes('start container') || logText.includes('starting')) progressPct = 80;
-        if (logText.includes('health check') || logText.includes('verify')) progressPct = 90;
-        if (logText.includes('live') || logText.includes('complete') || logText.includes('🚀')) progressPct = 100;
+        // Progress based on strict deployment log messages to prevent false positives
+        if (logText.includes('running local ci') || logText.includes('local ci checks')) progressPct = 10;
+        if (logText.includes('pushing to remote branch') || logText.includes('syncing local repository')) progressPct = 25;
+        if (logText.includes('remote ci (github actions)')) progressPct = 40;
+        if (logText.includes('using persistent connection') || logText.includes('connecting to')) progressPct = 50;
+        if (logText.includes('building docker image')) progressPct = 65;
+        if (logText.includes('starting new container')) progressPct = 80;
+        if (logText.includes('running health check') || logText.includes('verifying deployment')) progressPct = 90;
+        if (logText.includes('deployment complete') || logText.includes('live at:')) progressPct = 100;
         
         // Ensure minimum progress is shown
         progressPct = Math.max(10, Math.min(100, progressPct));

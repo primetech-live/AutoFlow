@@ -128,12 +128,24 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
     }, [activeSubTab, project.projectName]);
 
     useEffect(() => {
+        let isMounted = true;
+        let timeoutId: NodeJS.Timeout;
+
+        const pollLogs = async () => {
+            if (!isMounted) return;
+            await fetchLiveLogs(true);
+            if (isMounted) {
+                timeoutId = setTimeout(pollLogs, 3000);
+            }
+        };
+
         if (activeSubTab === 'logs') {
             fetchLiveLogs();
-            const interval = setInterval(() => {
-                fetchLiveLogs(true);
-            }, 3000);
-            return () => clearInterval(interval);
+            timeoutId = setTimeout(pollLogs, 3000);
+            return () => {
+                isMounted = false;
+                clearTimeout(timeoutId);
+            };
         }
     }, [activeSubTab, project.projectName, project.containerRawName]);
 

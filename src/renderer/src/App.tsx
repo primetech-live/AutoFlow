@@ -238,12 +238,24 @@ const App: React.FC = () => {
             });
         });
 
-        // Background polling — always attempt; IPC handler returns gracefully if not connected
-        const interval = setInterval(() => {
-            fetchGlobalStats(true);
-        }, 5000);
+        // Background polling — recursive setTimeout ensures we never stack/flood the SSH pool
+        let isMounted = true;
+        let timeoutId: NodeJS.Timeout;
 
-        return () => clearInterval(interval);
+        const pollGlobalStats = async () => {
+            if (!isMounted) return;
+            await fetchGlobalStats(true);
+            if (isMounted) {
+                timeoutId = setTimeout(pollGlobalStats, 5000);
+            }
+        };
+
+        timeoutId = setTimeout(pollGlobalStats, 5000);
+
+        return () => {
+            isMounted = false;
+            clearTimeout(timeoutId);
+        };
     }, []);
 
     const handleUnlockSuccess = async () => {

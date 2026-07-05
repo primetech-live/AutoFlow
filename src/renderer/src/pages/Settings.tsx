@@ -24,6 +24,12 @@ export const Settings: React.FC<SettingsProps> = ({ onReRunOnboarding, onResetCo
     const [sshKeyPath, setSshKeyPath] = useState('');
     const [sshPassword, setSshPassword] = useState('');
 
+    const [isServerConfigUnlocked, setIsServerConfigUnlocked] = useState(false);
+    const [unlockPassword, setUnlockPassword] = useState('');
+    const [unlockOtp, setUnlockOtp] = useState('');
+    const [unlockLoading, setUnlockLoading] = useState(false);
+    const [unlockError, setUnlockError] = useState('');
+
     const [loading, setLoading] = useState(false);
     const [connecting, setConnecting] = useState(false);
     const [saveStatus, setSaveStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -165,6 +171,27 @@ export const Settings: React.FC<SettingsProps> = ({ onReRunOnboarding, onResetCo
         }
     };
 
+    const handleUnlockConfig = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setUnlockError('');
+        setUnlockLoading(true);
+
+        try {
+            const success = await window.autoflow.unlockVault(unlockPassword, unlockOtp);
+            if (success) {
+                setIsServerConfigUnlocked(true);
+                setUnlockPassword('');
+                setUnlockOtp('');
+            } else {
+                setUnlockError('Invalid password or OTP token.');
+            }
+        } catch (err: any) {
+            setUnlockError(err.message || 'Failed to unlock. Please try again.');
+        } finally {
+            setUnlockLoading(false);
+        }
+    };
+
     const handleReRunOnboardingClick = () => {
         showConfirm({
             title: 'Re-run Onboarding',
@@ -192,7 +219,7 @@ export const Settings: React.FC<SettingsProps> = ({ onReRunOnboarding, onResetCo
                 <span className="text-secondary" style={{ fontSize: '13px' }}>Manage server connections, onboarding settings, and system state</span>
             </div>
 
-            <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+            <div className="responsive-stack" style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
                 {/* Left card: Edit Server Connection */}
                 <div className="card" style={{ flex: 2, minWidth: '400px' }}>
                     <h3 className="h2" style={{ fontSize: '16px', marginBottom: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px' }}>
@@ -216,95 +243,148 @@ export const Settings: React.FC<SettingsProps> = ({ onReRunOnboarding, onResetCo
                         </div>
                     )}
 
-                    <form onSubmit={handleSaveConfig} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                        <div className="form-group" style={{ marginBottom: 0 }}>
-                            <label className="form-label">Server IP Address</label>
-                            <input
-                                type="text"
-                                required
-                                placeholder="192.168.1.100"
-                                className="input"
-                                value={serverIp}
-                                onChange={(e) => setServerIp(e.target.value)}
-                            />
-                        </div>
+                    {!isServerConfigUnlocked ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 20px', textAlign: 'center', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                            <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'rgba(239, 68, 68, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px' }}>
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                                </svg>
+                            </div>
+                            <h4 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>Security Lock</h4>
+                            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '24px', maxWidth: '300px' }}>
+                                Server configuration is hidden. Please enter your master password and OTP to view or edit these details.
+                            </p>
 
-                        <div style={{ display: 'flex', gap: '16px' }}>
-                            <div className="form-group" style={{ flex: 2, marginBottom: 0 }}>
-                                <label className="form-label">SSH Username</label>
+                            <form onSubmit={handleUnlockConfig} style={{ width: '100%', maxWidth: '300px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                <PasswordInput
+                                    placeholder="Master Password"
+                                    required
+                                    className="input"
+                                    value={unlockPassword}
+                                    onChange={(e) => setUnlockPassword(e.target.value)}
+                                />
+                                <input
+                                    type="text"
+                                    placeholder="6-digit OTP"
+                                    required
+                                    pattern="\d{6}"
+                                    maxLength={6}
+                                    className="input"
+                                    value={unlockOtp}
+                                    onChange={(e) => setUnlockOtp(e.target.value)}
+                                />
+                                
+                                {unlockError && (
+                                    <div style={{ color: 'var(--error)', fontSize: '12px', textAlign: 'left' }}>
+                                        {unlockError}
+                                    </div>
+                                )}
+
+                                <button type="submit" disabled={unlockLoading} className="btn btn-primary" style={{ marginTop: '8px', padding: '10px' }}>
+                                    {unlockLoading ? 'Verifying...' : 'Unlock Configuration'}
+                                </button>
+                            </form>
+                        </div>
+                    ) : (
+                        <form onSubmit={handleSaveConfig} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                            <div className="form-group" style={{ marginBottom: 0 }}>
+                                <label className="form-label">Server IP Address</label>
                                 <input
                                     type="text"
                                     required
-                                    placeholder="root"
+                                    placeholder="192.168.1.100"
                                     className="input"
-                                    value={sshUser}
-                                    onChange={(e) => setSshUser(e.target.value)}
+                                    value={serverIp}
+                                    onChange={(e) => setServerIp(e.target.value)}
                                 />
                             </div>
-                            <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
-                                <label className="form-label">SSH Port</label>
-                                <input
-                                    type="text"
-                                    required
-                                    placeholder="22"
-                                    className="input"
-                                    value={sshPort}
-                                    onChange={(e) => setSshPort(e.target.value)}
+
+                            <div style={{ display: 'flex', gap: '16px' }}>
+                                <div className="form-group" style={{ flex: 2, marginBottom: 0 }}>
+                                    <label className="form-label">SSH Username</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        placeholder="root"
+                                        className="input"
+                                        value={sshUser}
+                                        onChange={(e) => setSshUser(e.target.value)}
+                                    />
+                                </div>
+                                <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
+                                    <label className="form-label">SSH Port</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        placeholder="22"
+                                        className="input"
+                                        value={sshPort}
+                                        onChange={(e) => setSshPort(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="form-group" style={{ marginBottom: '12px' }}>
+                                <label className="form-label">SSH Private Key Path</label>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <input
+                                        type="text"
+                                        required
+                                        placeholder="C:\Users\username\.ssh\id_rsa"
+                                        className="input"
+                                        value={sshKeyPath}
+                                        onChange={(e) => setSshKeyPath(e.target.value)}
+                                        style={{ flex: 1 }}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={handleBrowseKey}
+                                        className="btn btn-secondary"
+                                    >
+                                        Browse
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="form-group" style={{ marginBottom: '12px' }}>
+                                <label className="form-label">SSH Password Fallback (Optional, securely stored in Vault)</label>
+                                <PasswordInput
+                                    placeholder="Leave empty to keep existing password"
+                                    value={sshPassword}
+                                    onChange={(e) => setSshPassword(e.target.value)}
                                 />
                             </div>
-                        </div>
 
-                        <div className="form-group" style={{ marginBottom: '12px' }}>
-                            <label className="form-label">SSH Private Key Path</label>
-                            <div style={{ display: 'flex', gap: '8px' }}>
-                                <input
-                                    type="text"
-                                    required
-                                    placeholder="C:\Users\username\.ssh\id_rsa"
-                                    className="input"
-                                    value={sshKeyPath}
-                                    onChange={(e) => setSshKeyPath(e.target.value)}
-                                    style={{ flex: 1 }}
-                                />
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
                                 <button
                                     type="button"
-                                    onClick={handleBrowseKey}
+                                    onClick={() => setIsServerConfigUnlocked(false)}
                                     className="btn btn-secondary"
+                                    style={{ padding: '10px 24px', marginRight: 'auto' }}
                                 >
-                                    Browse
+                                    Lock Setup
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleReconnect}
+                                    disabled={loading || connecting}
+                                    className="btn btn-secondary"
+                                    style={{ padding: '10px 24px' }}
+                                >
+                                    {connecting ? 'Reconnecting...' : 'Reconnect'}
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={loading || connecting}
+                                    className="btn btn-primary"
+                                    style={{ padding: '10px 24px' }}
+                                >
+                                    {connecting ? 'Connecting to Server...' : (loading ? 'Saving Config...' : 'Save Configuration')}
                                 </button>
                             </div>
-                        </div>
-
-                        <div className="form-group" style={{ marginBottom: '12px' }}>
-                            <label className="form-label">SSH Password Fallback (Optional, securely stored in Vault)</label>
-                            <PasswordInput
-                                placeholder="Leave empty to keep existing password"
-                                value={sshPassword}
-                                onChange={(e) => setSshPassword(e.target.value)}
-                            />
-                        </div>
-
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
-                            <button
-                                type="button"
-                                onClick={handleReconnect}
-                                disabled={loading || connecting}
-                                className="btn btn-secondary"
-                                style={{ padding: '10px 24px' }}
-                            >
-                                {connecting ? 'Reconnecting...' : 'Reconnect'}
-                            </button>
-                            <button
-                                type="submit"
-                                disabled={loading || connecting}
-                                className="btn btn-primary"
-                                style={{ padding: '10px 24px' }}
-                            >
-                                {connecting ? 'Connecting to Server...' : (loading ? 'Saving Config...' : 'Save Configuration')}
-                            </button>
-                        </div>
-                    </form>
+                        </form>
+                    )}
                 </div>
 
                 {/* Right card: System Maintenance & Danger Zone */}

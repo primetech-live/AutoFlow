@@ -124,7 +124,9 @@ export const LockScreen: React.FC<LockScreenProps> = ({
       />
 
       {/* ── Floating glassmorphic card — right side ── */}
+      <div className="responsive-lock-overlay" />
       <div
+        className="responsive-lock-card"
         style={{
           position: "absolute",
           top: "50%",

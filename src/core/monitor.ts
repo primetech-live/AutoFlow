@@ -31,115 +31,86 @@ export class MonitorEngine {
         const startTime = Date.now();
 
         try {
+            // A single optimized bash script to fetch all metrics instantly in one SSH roundtrip
+            const megaScript = `
+                cpu=$(top -bn1 | grep 'Cpu(s)' | sed 's/.*, *\\([0-9.]*\\)%* id.*/\\1/' | awk '{print 100 - $1}' || echo "0")
+                ram=$(free -m | awk '/Mem:/ {print $3 " MB / " $2 " MB"}' || echo "0 MB / 0 MB")
+                disk=$(df -h / | tail -n 1 | awk '{print $3 " / " $2 "," $5}' || echo "0 / 0,0")
+                uptime_val=$(uptime -p | sed 's/^up //' || echo "Unknown")
+
+                ps_out=$(docker ps -a --format '{{.Names}}#{{.Status}}' 2>/dev/null)
+                stats_out=$(docker stats --no-stream --format '{{.Name}}#{{.CPUPerc}}#{{.MemUsage}}' 2>/dev/null)
+
+                echo -n "{\\"cpu\\":\\"$cpu\\",\\"ram\\":\\"$ram\\",\\"disk\\":\\"$disk\\",\\"uptime\\":\\"$uptime_val\\",\\"docker\\":["
+                first=1
+                while IFS= read -r line; do
+                    if [ -z "$line" ]; then continue; fi
+                    name="\${line%%#*}"
+                    status="\${line#*#}"
+                    if [ $first -eq 1 ]; then first=0; else echo -n ","; fi
+                    
+                    cpu_usage="0%"
+                    mem_usage="0MB"
+                    stats_line=$(echo "$stats_out" | grep "^$name#" || true)
+                    if [ -n "$stats_line" ]; then
+                        cpu_usage=$(echo "$stats_line" | cut -d'#' -f2)
+                        mem_usage=$(echo "$stats_line" | cut -d'#' -f3 | awk '{print $1}')
+                    fi
+                    echo -n "{\\"name\\":\\"$name\\",\\"status\\":\\"$status\\",\\"cpu\\":\\"$cpu_usage\\",\\"mem\\":\\"$mem_usage\\"}"
+                done <<< "$ps_out"
+                echo -n "]}"
+            `;
+
+            const rawJson = await connectionManager.safeRun(megaScript);
             const latency = `${Date.now() - startTime} ms`;
 
-            // Run status collection commands in parallel
-            const [cpuRaw, ramRaw, diskRaw, uptimeRaw, dockerRaw] = await Promise.all([
-                connectionManager.safeRun("top -bn1 | grep 'Cpu(s)' | sed 's/.*, *\\([0-9.]*\\)%* id.*/\\1/' | awk '{print 100 - $1}'"),
-                connectionManager.safeRun("free -m"),
-                connectionManager.safeRun("df -h / | tail -n 1 | awk '{print $3 \" / \" $2 \",\" $5}'"),
-                connectionManager.safeRun("uptime -p"),
-                connectionManager.safeRun("docker ps -a --format '{{.Names}},{{.Status}}'"),
-            ]);
+            if (!rawJson) {
+                throw new Error('Failed to receive stats payload');
+            }
+
+            let payload: any = {};
+            try {
+                payload = JSON.parse(rawJson.trim());
+            } catch (parseErr) {
+                console.error('[MonitorEngine] JSON Parse Error:', rawJson);
+                throw new Error('Invalid JSON payload from server stats');
+            }
 
             // 1. Process CPU
             let cpu = '0.0%';
-            if (cpuRaw) {
-                cpu = `${parseFloat(cpuRaw.trim()).toFixed(1)}%`;
+            if (payload.cpu && payload.cpu !== '100') {
+                cpu = `${parseFloat(payload.cpu).toFixed(1)}%`;
             }
 
             // 2. Process RAM
-            let ram = 'N/A';
+            let ram = payload.ram || 'N/A';
             let ramPercent = 0;
-            if (ramRaw) {
-                const lines = ramRaw.split('\n');
-                const memLine = lines.find(l => l.includes('Mem:'));
-                if (memLine) {
-                    const parts = memLine.split(/\s+/).filter(Boolean);
-                    const total = parseInt(parts[1], 10);
-                    const used = parseInt(parts[2], 10);
-                    if (total > 0) {
-                        ram = `${used} MB / ${total} MB`;
-                        ramPercent = Math.round((used / total) * 100);
-                    }
+            if (ram !== 'N/A') {
+                const parts = ram.split(' / ');
+                if (parts.length === 2) {
+                    const used = parseInt(parts[0]);
+                    const total = parseInt(parts[1]);
+                    if (total > 0) ramPercent = Math.round((used / total) * 100);
                 }
             }
 
             // 3. Process Disk
             let disk = 'N/A';
             let diskPercent = 0;
-            if (diskRaw) {
-                const [usage, pctStr] = diskRaw.trim().split(',');
+            if (payload.disk) {
+                const [usage, pctStr] = payload.disk.split(',');
                 disk = usage || 'N/A';
                 diskPercent = parseInt(pctStr, 10) || 0;
             }
 
             // 4. Process Uptime
-            const uptime = uptimeRaw ? uptimeRaw.trim().replace(/^up /, '') : 'Unknown';
+            const uptime = payload.uptime || 'Unknown';
 
-            // 5. Process Docker containers or PM2 / Systemd fallbacks
-            const containers: ServerStats['containers'] = [];
-            if (dockerRaw) {
-                const rows = dockerRaw.trim().split('\n').filter(Boolean);
-                const names = rows.map(r => r.split(',')[0]).filter(Boolean);
+            // 5. Process Docker containers
+            const containers: ServerStats['containers'] = payload.docker || [];
 
-                // Fetch all container stats in a single docker stats call (fast)
-                let statsMap: Record<string, { cpu: string; mem: string }> = {};
-                if (names.length > 0) {
-                    const allStatsRaw = await connectionManager.safeRun(
-                        `docker stats ${names.join(' ')} --no-stream --format "{{.Name}},{{.CPUPerc}},{{.MemUsage}}"`
-                    );
-                    if (allStatsRaw) {
-                        for (const line of allStatsRaw.trim().split('\n').filter(Boolean)) {
-                            const parts = line.split(',');
-                            if (parts.length >= 3) {
-                                statsMap[parts[0]] = {
-                                    cpu: parts[1] || '0%',
-                                    mem: parts[2] ? parts[2].split(' / ')[0] : '0MB'
-                                };
-                            }
-                        }
-                    }
-                }
-
-                for (const row of rows) {
-                    const [name, status] = row.split(',');
-                    const s = statsMap[name] || { cpu: '0%', mem: '0MB' };
-                    containers.push({
-                        name: name || 'unknown',
-                        status: status || 'stopped',
-                        cpu: s.cpu,
-                        mem: s.mem,
-                    });
-                }
-            } else {
-                // Fallback 1: PM2 process monitoring
-                const pm2Raw = await connectionManager.safeRun("pm2 jlist");
-                if (pm2Raw) {
-                    try {
-                        const apps = JSON.parse(pm2Raw.trim());
-                        if (Array.isArray(apps) && apps.length > 0) {
-                            for (const app of apps) {
-                                const name = app.name || 'PM2 App';
-                                const status = app.pm2_env?.status || 'unknown';
-                                const cpu = app.monit?.cpu !== undefined ? `${app.monit.cpu}%` : '0%';
-                                const memBytes = app.monit?.memory || 0;
-                                const mem = memBytes > 0 ? `${(memBytes / (1024 * 1024)).toFixed(1)} MB` : '0 MB';
-                                containers.push({
-                                    name: `[pm2] ${name}`,
-                                    status,
-                                    cpu,
-                                    mem
-                                });
-                            }
-                        }
-                    } catch {
-                        // ignore JSON parser error
-                    }
-                }
-
-                // Fallback 2: Systemd active services list (Removed to prevent showing OS-level services)
-            }
+            // We omit PM2 and Systemd from the mega script to keep it minimal and Docker-focused.
+            // If they are needed later, they can be appended to the JSON array similarly.
 
             return {
                 cpu,

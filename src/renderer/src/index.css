@@ -500,5 +500,52 @@ body {
 [data-theme="dark"] .skeleton-shimmer {
     background: linear-gradient(90deg, var(--bg-panel) 25%, #25252b 50%, var(--bg-panel) 75%);
     background-size: 200% 100%;
-    animation: skeleton-shimmer 1.5s infinite linear;
+}
+
+/* Responsive Layout Utilities */
+
+/* LockScreen Responsiveness */
+.responsive-lock-overlay {
+    display: none;
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 1;
+}
+
+@media (max-width: 1200px) {
+    .responsive-lock-overlay {
+        display: block;
+    }
+    .responsive-lock-card {
+        right: 50% !important;
+        transform: translate(50%, -50%) !important;
+        width: 90% !important;
+        max-width: 480px !important;
+    }
+}
+
+/* General Layout Stacking for small width */
+@media (max-width: 900px) {
+    .responsive-stack {
+        flex-direction: column !important;
+    }
+    .responsive-stack > * {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        flex: none !important;
+    }
+    .responsive-gap-reduce {
+        gap: 16px !important;
+    }
+    
+    .titlebar .logo span {
+        display: none; /* Hide 'AUTOFLOW' text on very small screens to save space */
+    }
+    .titlebar .badge {
+        display: none; 
+    }
 }

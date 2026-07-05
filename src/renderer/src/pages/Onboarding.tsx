@@ -180,7 +180,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                             Choose a theme for your AutoFlow dashboard. You can always change this later in Settings.
                         </p>
                         
-                        <div style={{ display: 'flex', gap: '16px', marginBottom: '32px' }}>
+                        <div className="responsive-stack responsive-gap-reduce" style={{ display: 'flex', gap: '16px', marginBottom: '32px' }}>
                             {['light', 'dark', 'system'].map((t) => (
                                 <div 
                                     key={t}
@@ -231,7 +231,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                             />
                         </div>
 
-                        <div style={{ display: 'flex', gap: '16px' }}>
+                        <div className="responsive-stack responsive-gap-reduce" style={{ display: 'flex', gap: '16px' }}>
                             <div className="form-group" style={{ flex: 2 }}>
                                 <label className="form-label">SSH Username</label>
                                 <input
@@ -259,7 +259,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                         {/* SSH Auth Method Toggle */}
                         <div className="form-group">
                             <label className="form-label">Authentication Method</label>
-                            <div style={{
+                            <div className="responsive-stack" style={{
                                 display: 'flex',
                                 background: 'var(--bg-main)',
                                 border: '1px solid var(--border-color)',
@@ -297,7 +297,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                         {sshAuthMethod === 'key' && (
                             <div className="form-group" style={{ marginBottom: '32px' }}>
                                 <label className="form-label">SSH Private Key Path</label>
-                                <div style={{ display: 'flex', gap: '8px' }}>
+                                <div className="responsive-stack" style={{ display: 'flex', gap: '8px' }}>
                                     <input
                                         type="text"
                                         placeholder="C:\Users\username\.ssh\id_rsa"
