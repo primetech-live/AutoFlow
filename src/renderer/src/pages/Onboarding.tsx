@@ -3,6 +3,8 @@ import { WarningIcon } from '../components/Icons';
 import { QRCodeSVG } from 'qrcode.react';
 import { useTheme } from '../contexts/ThemeContext';
 import { PasswordInput } from '../components/PasswordInput';
+import darkBg from '../../assets/dark_google_login_bg.png';
+import lightBg from '../../assets/light_google_login_bg.png';
 
 interface OnboardingProps {
     onComplete: () => void;
@@ -10,7 +12,7 @@ interface OnboardingProps {
 
 export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
     const [step, setStep] = useState(0);
-    const { theme, setTheme } = useTheme();
+    const { theme, setTheme, resolvedTheme } = useTheme();
     
     // Server state
     const [serverIp, setServerIp] = useState('');
@@ -122,6 +124,10 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
     return (
         <div style={{
             background: 'var(--bg-main)',
+            backgroundImage: `url(${resolvedTheme === 'dark' ? darkBg : lightBg})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
             height: '100%',
             width: '100%',
             display: 'flex',

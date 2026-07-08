@@ -12,6 +12,11 @@ import { LogLine } from './components/LoggerConsole';
 import { DashboardIcon, LiveStatusIcon, SettingsIcon, WarningIcon } from './components/Icons';
 import { InitProjectModal } from './components/InitProjectModal';
 import { useAuth } from './core/AuthProvider';
+import { supabase } from './core/supabase';
+import { useTheme } from './contexts/ThemeContext';
+import darkBg from '../assets/dark_google_login_bg.png';
+import lightBg from '../assets/light_google_login_bg.png';
+import appIcon from '../assets/icon-1.png';
 
 declare global {
     interface Window {
@@ -76,7 +81,9 @@ const App: React.FC = () => {
 
     const showConfirm = (opts: typeof confirmModal) => setConfirmModal(opts);
     
-    const { user, isLoading: authLoading, signInWithGoogle } = useAuth();
+    const { user, isLoading: authLoading, signInWithGoogle, signOut } = useAuth();
+    const [termsAccepted, setTermsAccepted] = useState(false);
+    const { resolvedTheme } = useTheme();
 
     const checkState = async () => {
         try {
@@ -256,6 +263,13 @@ const App: React.FC = () => {
 
         timeoutId = setTimeout(pollGlobalStats, 5000);
 
+        // Uninstall/Fresh install logout check
+        const hasRun = localStorage.getItem('autoflow_has_run');
+        if (!hasRun) {
+            signOut();
+            localStorage.setItem('autoflow_has_run', 'true');
+        }
+
         return () => {
             isMounted = false;
             clearTimeout(timeoutId);
@@ -434,6 +448,15 @@ const App: React.FC = () => {
         setInterruptedJob(null);
     };
 
+    // Save consent on successful login
+    useEffect(() => {
+        if (user && termsAccepted) {
+            supabase.from('user_consents').insert({ user_id: user.id }).then(() => {
+                setTermsAccepted(false); // Reset so it doesn't trigger again
+            });
+        }
+    }, [user, termsAccepted]);
+
     // Render loading screen while app states are read
     if (appLoading || authLoading) {
         return (
@@ -447,18 +470,102 @@ const App: React.FC = () => {
         return (
             <div className="app-container">
                 <Titlebar isUnlocked={false} />
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-main)' }}>
-                    <div className="card" style={{ maxWidth: '400px', width: '100%', textAlign: 'center', padding: '40px 32px' }}>
-                        <h2 className="h1" style={{ marginBottom: '16px' }}>Sign in to AutoFlow</h2>
-                        <p className="text-secondary" style={{ marginBottom: '32px', fontSize: '14px', lineHeight: '1.5' }}>
+                <div style={{ 
+                    flex: 1, 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    background: 'var(--bg-main)',
+                    backgroundImage: `url(${resolvedTheme === 'dark' ? darkBg : lightBg})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    backgroundRepeat: 'no-repeat'
+                }}>
+                    <div style={{
+                        background: resolvedTheme === 'dark' ? 'rgba(15, 15, 20, 0.4)' : 'rgba(255, 255, 255, 0.6)',
+                        backdropFilter: 'blur(24px)',
+                        WebkitBackdropFilter: 'blur(24px)',
+                        border: '1px solid',
+                        borderColor: resolvedTheme === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.1)',
+                        borderTop: resolvedTheme === 'dark' ? '1px solid rgba(6, 182, 212, 0.5)' : '1px solid var(--accent)',
+                        borderLeft: resolvedTheme === 'dark' ? '1px solid rgba(6, 182, 212, 0.3)' : '1px solid rgba(2, 132, 199, 0.3)',
+                        borderRadius: '24px',
+                        padding: '48px 40px',
+                        width: '420px',
+                        maxWidth: '90%',
+                        boxShadow: '0 24px 48px rgba(0,0,0,0.2)',
+                        textAlign: 'center',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center'
+                    }}>
+                        {/* Logo */}
+                        <img src={appIcon} alt="AutoFlow Logo" style={{ width: '80px', height: '80px', marginBottom: '24px' }} />
+                        
+                        {/* Title */}
+                        <h1 className="h1" style={{ fontSize: '28px', marginBottom: '8px', letterSpacing: '-0.5px' }}>
+                            Welcome to <span style={{ color: 'var(--accent)' }}>AutoFlow</span>
+                        </h1>
+                        <span className="text-secondary" style={{ fontSize: '15px', display: 'block', marginBottom: '8px' }}>
+                            Deploy. Automate. Scale.
+                        </span>
+                        
+                        {/* Divider */}
+                        <div style={{ width: '100%', height: '1px', background: resolvedTheme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)', margin: '28px 0', position: 'relative', display: 'flex', justifyContent: 'center' }}>
+                            <div style={{ width: '48px', height: '3px', background: 'var(--accent)', borderRadius: '2px', position: 'absolute', top: '-1px' }}></div>
+                        </div>
+                        
+                        {/* Subtitle */}
+                        <h2 className="h2" style={{ fontSize: '18px', marginBottom: '12px' }}>Sign in to continue</h2>
+                        <span className="text-secondary" style={{ fontSize: '13px', lineHeight: '1.5', display: 'block', marginBottom: '32px' }}>
                             Authenticate to sync your account, unlock cloud features, and manage your commercial plan.
-                        </p>
+                        </span>
+
+                        {/* Terms */}
+                        <div style={{
+                            marginBottom: '24px',
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            gap: '10px',
+                            textAlign: 'left',
+                            width: '100%'
+                        }}>
+                            <input 
+                                type="checkbox" 
+                                id="loginTermsCheckbox" 
+                                checked={termsAccepted} 
+                                onChange={(e) => setTermsAccepted(e.target.checked)} 
+                                style={{ width: '16px', height: '16px', marginTop: '2px', cursor: 'pointer', flexShrink: 0, accentColor: 'var(--accent)', borderRadius: '4px' }}
+                            />
+                            <label htmlFor="loginTermsCheckbox" style={{ fontSize: '12.5px', color: 'var(--text-secondary)', cursor: 'pointer', lineHeight: '1.5' }}>
+                                (Optional) I agree to the <a href="https://example.com/terms" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 500 }}>Terms of Service</a> and Liability Disclaimer.
+                            </label>
+                        </div>
+
+                        {/* Google Button */}
                         <button 
-                            className="btn btn-primary" 
-                            style={{ width: '100%', padding: '12px', fontSize: '14px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px' }}
+                            style={{ 
+                                width: '100%', 
+                                padding: '14px', 
+                                fontSize: '14.5px', 
+                                display: 'flex', 
+                                justifyContent: 'center', 
+                                alignItems: 'center', 
+                                gap: '12px', 
+                                fontWeight: 600, 
+                                borderRadius: '12px',
+                                background: resolvedTheme === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.8)',
+                                border: resolvedTheme === 'dark' ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.1)',
+                                color: 'var(--text-primary)',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                            }}
+                            onMouseOver={(e) => e.currentTarget.style.background = resolvedTheme === 'dark' ? 'rgba(255,255,255,0.08)' : '#fff'}
+                            onMouseOut={(e) => e.currentTarget.style.background = resolvedTheme === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.8)'}
                             onClick={signInWithGoogle}
                         >
-                            <svg viewBox="0 0 24 24" width="18" height="18" xmlns="http://www.w3.org/2000/svg">
+                            <svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
                                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
                                 <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
                                 <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
