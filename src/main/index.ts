@@ -6,6 +6,7 @@ import { registerIpcHandlers } from './ipc';
 import { deployerEngine } from '../core/deployer';
 import { connectionManager } from '../core/connection';
 import { globalConfigExists, loadGlobalConfig } from '../core/config';
+import { autoUpdater } from 'electron-updater';
 
 let mainWindow: BrowserWindow | null = null;
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
@@ -104,6 +105,11 @@ function createWindow() {
 
 app.whenReady().then(async () => {
     createWindow();
+
+    // Check for updates
+    if (!isDev) {
+        autoUpdater.checkForUpdatesAndNotify();
+    }
 
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {
