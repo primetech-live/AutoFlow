@@ -408,20 +408,18 @@ export const Settings: React.FC<SettingsProps> = ({ onReRunOnboarding, onResetCo
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                     <span className="text-secondary">Projects Used</span>
-                                    <span style={{ fontWeight: 600 }}>{projectCount} / 2</span>
+                                    <span style={{ fontWeight: 600 }}>
+                                        {projectCount} / {profile.plan === 'infinet' ? 'Unlimited' : (profile.plan === 'ultra' ? 15 : (profile.plan === 'pro' ? 5 : 1))}
+                                    </span>
                                 </div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                    <span className="text-secondary">Remaining Projects</span>
-                                    <span style={{ fontWeight: 600 }}>{Math.max(0, 2 - projectCount)}</span>
-                                </div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                    <span className="text-secondary">Deployments Used</span>
-                                    <span style={{ fontWeight: 600 }}>{profile.deployment_count || 0}</span>
-                                </div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                    <span className="text-secondary">Remaining Deployments</span>
-                                    <span style={{ fontWeight: 600 }}>{Math.max(0, 20 - (profile.deployment_count || 0))}</span>
-                                </div>
+                                {profile.plan !== 'infinet' && (
+                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <span className="text-secondary">Remaining Projects</span>
+                                        <span style={{ fontWeight: 600 }}>
+                                            {Math.max(0, (profile.plan === 'ultra' ? 15 : (profile.plan === 'pro' ? 5 : 1)) - projectCount)}
+                                        </span>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}

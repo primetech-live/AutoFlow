@@ -324,8 +324,18 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
         const userId = getCurrentUserId();
         if (userId) {
             const { data, error } = await supabase.from('user_profiles').select('project_count, plan').eq('id', userId).single();
-            if (data && data.plan === 'free' && data.project_count >= 2) {
-                throw new Error('Free plan limit reached: Maximum 2 projects allowed. Please upgrade.');
+            if (data) {
+                let limit = 1;
+                switch (data.plan) {
+                    case 'free': limit = 1; break;
+                    case 'pro': limit = 5; break;
+                    case 'ultra': limit = 15; break;
+                    case 'infinet': limit = Infinity; break;
+                    default: limit = 1;
+                }
+                if (data.project_count >= limit) {
+                    throw new Error(`Plan limit reached: Maximum ${limit} project(s) allowed. Please upgrade.`);
+                }
             }
             if (!error) {
                 await supabase.from('user_profiles').update({ project_count: data.project_count + 1 }).eq('id', userId);
@@ -407,15 +417,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
             projectName = cfg.projectName || projectName;
         } catch { /* use basename fallback */ }
 
-        // Check limits
         const userId = getCurrentUserId();
-        if (userId) {
-            const history = deployerEngine.getHistory(projectName) || [];
-            if (history.length >= 20) {
-                if (!mainWindow.isDestroyed()) mainWindow.webContents.send('deploy:failed', { error: 'Free plan limit reached: Maximum 20 deployments per project.' });
-                return { success: false };
-            }
-        }
 
         // Stream every log line straight to the renderer terminal
         const logListener = (type: LogType, message: string) => {
@@ -442,12 +444,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
                 })()
             });
 
-            if (userId) {
-                const { data } = await supabase.from('user_profiles').select('deployment_count').eq('id', userId).single();
-                if (data) {
-                    await supabase.from('user_profiles').update({ deployment_count: data.deployment_count + 1 }).eq('id', userId);
-                }
-            }
+
 
             if (!mainWindow.isDestroyed()) mainWindow.webContents.send('deploy:success', {});
         } catch (err: any) {
