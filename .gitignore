@@ -10,6 +10,7 @@ coverage/
 build/
 dist/
 release/
+release-new/
 
 # Misc
 .DS_Store
