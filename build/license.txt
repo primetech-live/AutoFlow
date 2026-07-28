@@ -1,0 +1,14 @@
+User Consent Agreement (UCA) & Terms and Conditions
+
+1. USER CONSENT AGREEMENT
+We only use your Google ID for authentication purposes to sync your account and unlock cloud features. We do not collect server-related info or store any of your server data on our backend infrastructure. 
+
+By installing and using this software, you explicitly agree that Primetech Digital Solutions and the AutoFlow team will not be held responsible for any damage, data loss, security breaches, or other issues related to your VPS, servers, or projects.
+
+2. TERMS AND CONDITIONS
+a. Usage: You are granted a limited, non-exclusive license to use AutoFlow for your personal and commercial deployment needs.
+b. Disclaimer of Warranty: The software is provided "AS IS", without warranty of any kind, express or implied.
+c. Limitation of Liability: In no event shall the authors or copyright holders be liable for any claim, damages, or other liability arising from the use of the software.
+d. Modifications: We reserve the right to modify or terminate the service for any reason, without notice at any time.
+
+By proceeding with the installation, you acknowledge that you have read, understood, and agreed to both the User Consent Agreement and the Terms and Conditions.
