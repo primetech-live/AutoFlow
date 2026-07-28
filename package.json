@@ -1,6 +1,6 @@
 {
   "name": "autoflow-tech",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Automated CI/CD CLI tool for students and beginners",
   "main": "dist/src/main/index.js",
   "bin": {
@@ -14,7 +14,7 @@
     "dev:ui": "vite",
     "dev:cli": "ts-node bin/index.ts",
     "pack": "npm run build && electron-builder --dir",
-    "dist": "npm run build && electron-builder",
+    "dist": "npx electron-builder",
     "postinstall": "node scripts/postinstall.js",
     "prepublishOnly": "npm run build",
     "test": "jest"

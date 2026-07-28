@@ -31,7 +31,13 @@ jobs:
     needs: lint-and-test
     strategy:
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
+        include:
+          - os: windows-latest
+            target_flag: --win
+          - os: ubuntu-latest
+            target_flag: --linux
+          - os: macos-latest
+            target_flag: --mac
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -40,18 +46,23 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libarchive-tools libopenjp2-7
+
       - run: npm install
       - run: npm run build
 
       # On branch pushes: just package locally, never publish
       - name: Package (branch push — no publish)
         if: github.ref_type != 'tag'
-        run: npm run dist -- -p never
+        run: npm run dist -- ${{ matrix.target_flag }} -p never
 
       # On tag pushes: package AND publish to GitHub Releases
       - name: Package & Publish Release
         if: github.ref_type == 'tag'
-        run: npm run dist -- -p always
+        run: npm run dist -- ${{ matrix.target_flag }} -p always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
