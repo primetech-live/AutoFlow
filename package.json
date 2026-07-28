@@ -80,7 +80,10 @@
     "ssh",
     "cicd"
   ],
-  "author": "PrimeTech",
+  "author": {
+    "name": "PrimeTech",
+    "email": "support@autoflow.tech"
+  },
   "license": "MIT",
   "files": [
     "bin",
