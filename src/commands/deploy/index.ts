@@ -223,7 +223,7 @@ async function deploy(isDesktop: boolean = false, projectDir: string = process.c
         handleFatalError(fatalErr);
     }
 
-    if (!isDesktop) {
+    if (!isDesktop && process.env.NODE_ENV !== 'test') {
         // Diagnostic logs for Issue 3 terminal hang investigation
         log.info(`[Diagnostic] Reached absolute end of deploy execution. isDesktop=${isDesktop}`);
         log.info('[Diagnostic] Calling process.exit(0) now...');
