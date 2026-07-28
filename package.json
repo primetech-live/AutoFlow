@@ -59,6 +59,13 @@
     },
     "dmg": {
       "sign": false
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Utility"
     }
   },
   "engines": {
