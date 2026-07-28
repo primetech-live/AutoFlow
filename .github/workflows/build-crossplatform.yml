@@ -1,37 +1,67 @@
-name: Build & Release
+name: AutoFlow CI/CD
 
 on:
   push:
+    branches: [ main, beta ]
     tags:
       - 'v*'
       - '*.*.*'
+  pull_request:
+    branches: [ main, beta ]
 
 permissions:
   contents: write
 
 jobs:
+  # ─── Stage 1: Quality Gate ────────────────────────────────────────────────
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm install
+      - run: npm test
+
+  # ─── Stage 2: Cross-Platform Build ───────────────────────────────────────
   build:
+    needs: lint-and-test
     strategy:
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
+      - run: npm install
+      - run: npm run build
 
-      - name: Install dependencies
-        run: npm install
+      # On branch pushes: just package locally, never publish
+      - name: Package (branch push — no publish)
+        if: github.ref_type != 'tag'
+        run: npm run dist -- -p never
 
-      - name: Build application
-        run: npm run build
-
+      # On tag pushes: package AND publish to GitHub Releases
       - name: Package & Publish Release
         if: github.ref_type == 'tag'
         run: npm run dist -- -p always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: autoflow-package-${{ matrix.os }}
+          path: |
+            release/*.exe
+            release/*.dmg
+            release/*.AppImage
+            release/*.deb
+          if-no-files-found: ignore
