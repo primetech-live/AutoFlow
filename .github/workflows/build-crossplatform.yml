@@ -77,26 +77,3 @@ jobs:
             release/*.deb
           if-no-files-found: ignore
 
-  # ─── Stage 3: Publish Website to Autoflow-Release Repo ───────────────────
-  publish-website:
-    needs: lint-and-test
-    if: github.ref_type == 'tag'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Deploy website/ to primetech-live/Autoflow-Release
-        run: |
-          git config --global user.email "ci@autoflow.tech"
-          git config --global user.name "AutoFlow CI"
-
-          # Clone the public releases repo
-          git clone https://x-access-token:${{ secrets.RELEASE_TOKEN }}@github.com/primetech-live/Autoflow-Release.git public-repo
-
-          # Sync website/ folder contents into the public repo
-          rsync -av --delete website/ public-repo/website/
-
-          cd public-repo
-          git add -A
-          git diff --staged --quiet || git commit -m "chore: update website for release ${{ github.ref_name }}"
-          git push
