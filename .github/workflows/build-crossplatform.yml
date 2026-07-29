@@ -94,13 +94,115 @@ jobs:
           git config --global user.email "ci@autoflow.tech"
           git config --global user.name "AutoFlow CI"
           git clone https://x-access-token:${GIT_TOKEN}@github.com/primetech-live/Autoflow-Release.git public-repo
+name: AutoFlow CI/CD
+
+on:
+  push:
+    branches: [ main, beta ]
+    tags:
+      - 'v*'
+      - '*.*.*'
+  pull_request:
+    branches: [ main, beta ]
+
+permissions:
+  contents: write
+
+jobs:
+  # ─── Stage 1: Quality Gate ────────────────────────────────────────────────
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm install
+      - run: npm test
+
+  # ─── Stage 2: Cross-Platform Build ───────────────────────────────────────
+  build:
+    needs: lint-and-test
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            target_flag: --win
+          - os: ubuntu-latest
+            target_flag: --linux
+          - os: macos-latest
+            target_flag: --mac
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libarchive-tools libopenjp2-7
+
+      - run: npm install
+      - run: npm run build
+
+      # On branch pushes: just package locally, never publish
+      - name: Package (branch push — no publish)
+        if: github.ref_type != 'tag'
+        run: npm run dist -- ${{ matrix.target_flag }} -p never
+
+      # On tag pushes: package AND publish to primetech-live/Autoflow-Release (public repo)
+      - name: Package & Publish Release
+        if: github.ref_type == 'tag'
+        run: npm run dist -- ${{ matrix.target_flag }} -p always
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: autoflow-package-${{ matrix.os }}
+          path: |
+            release/*.exe
+            release/*.dmg
+            release/*.AppImage
+            release/*.deb
+          if-no-files-found: ignore
+
+
+  # ─── Stage 3: Publish binaries to public repo ───────────────────────────────
+  publish-binaries:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all build artefacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./collected-artifacts
+      - name: Clone public releases repo
+        env:
+          GIT_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          git config --global user.email "ci@autoflow.tech"
+          git config --global user.name "AutoFlow CI"
+          git clone https://x-access-token:${GIT_TOKEN}@github.com/primetech-live/Autoflow-Release.git public-repo
       - name: Copy binaries to public repo
         run: |
-           mkdir -p public-repo/release
-           find collected-artifacts -type f -exec cp -t public-repo/release {} +
+          mkdir -p public-repo/release
+          find collected-artifacts -type f -exec cp -t public-repo/release {} +
+          echo "=== Files in public-repo/release after copy ==="
+          ls -R public-repo/release
       - name: Commit & push binaries
         run: |
           cd public-repo
+          # create a version marker so there is always a change
+          echo "${{ github.ref_name }}" > release/VERSION
           git add -A
-          git diff --quiet || git commit -m "chore: publish binaries for ${{ github.ref_name }}"
+          echo "=== git status before commit ==="
+          git status -s
+          git commit -m "chore: publish binaries for ${{ github.ref_name }}" || echo "No changes to commit"
           git push
