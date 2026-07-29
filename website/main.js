@@ -124,8 +124,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // 5. OS Detection & Direct GitHub Release Download Links
-  const REPO_OWNER = 'Sanji1305';
-  const REPO_NAME = 'AutoFlow';
+  const REPO_OWNER = 'primetech-live';
+  const REPO_NAME = 'Autoflow-Release';
   const RELEASE_TAG = '1.1.2';
   const RELEASE_BASE = `https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/${RELEASE_TAG}`;
 
