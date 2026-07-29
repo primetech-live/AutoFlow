@@ -57,7 +57,10 @@ jobs:
       # On branch pushes: just package locally, never publish
       - name: Package (branch push — no publish)
         if: github.ref_type != 'tag'
-        run: npm run dist -- ${{ matrix.target_flag }} -p never
+        run: |
+          mkdir -p release
+          echo "${{ github.ref_name }}-${{ github.sha }}" > release/VERSION
+          npm run dist -- ${{ matrix.target_flag }} -p never
 
       # On tag pushes: package AND publish to primetech-live/Autoflow-Release (public repo)
       - name: Package & Publish Release
@@ -94,5 +97,30 @@ jobs:
           git config --global user.email "ci@autoflow.tech"
           git config --global user.name "AutoFlow CI"
           git clone https://x-access-token:${GIT_TOKEN}@github.com/primetech-live/Autoflow-Release.git public-repo
-
-
+      - name: Debug artefact layout
+        run: |
+          echo "=== Collected artefacts directory tree ==="
+          ls -R collected-artifacts
+      - name: Copy binaries to public repo
+        run: |
+          mkdir -p public-repo/release
+          find collected-artifacts -type f -exec cp -t public-repo/release {} +
+      - name: List copied files
+        run: |
+          echo "=== Files now in public-repo/release ==="
+          ls -l public-repo/release
+      - name: Set remote with token (ensure push auth)
+        env:
+          GIT_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          cd public-repo
+          git remote set-url origin https://x-access-token:${GIT_TOKEN}@github.com/primetech-live/Autoflow-Release.git
+      - name: Commit & push binaries
+        run: |
+          cd public-repo
+          # version marker already created in package step for tags, ensure VERSION exists
+          git add -A
+          echo "=== git status before commit ==="
+          git status -s
+          git commit -m "chore: publish binaries for ${{ github.ref_name }}" || echo "No changes to commit"
+          git push
