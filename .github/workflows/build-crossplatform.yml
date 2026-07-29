@@ -77,3 +77,29 @@ jobs:
             release/*.deb
           if-no-files-found: ignore
 
+
+  # ─── Stage 3: Publish binaries to public repo ───────────────────────────────
+  publish-binaries:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all build artefacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./collected-artifacts
+      - name: Clone public releases repo
+        env:
+          GIT_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          git config --global user.email "ci@autoflow.tech"
+          git config --global user.name "AutoFlow CI"
+          git clone https://x-access-token:${GIT_TOKEN}@github.com/primetech-live/Autoflow-Release.git public-repo
+      - name: Copy binaries to public repo
+        run: |
+          cp -r collected-artifacts/* public-repo/release/
+      - name: Commit & push binaries
+        run: |
+          cd public-repo
+          git add -A
+          git diff --quiet || git commit -m "chore: publish binaries for ${{ github.ref_name }}"
+          git push
