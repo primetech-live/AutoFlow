@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="AutoFlow - A local-first deployment orchestrator for developers.">
+  <title>AutoFlow | Precision Deployment Orchestrator</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="styles.css">
+
+  <link rel="icon" type="image/png" href="Assets/icon-1.png">
+</head>
+<body>
+
+  <!-- Section 1: Header -->
+  <header class="site-header" id="header">
+    <div class="container header-inner">
+      <a href="index.html" class="logo">
+        <img src="Assets/icon-1.png" alt="AutoFlow Icon" class="logo-img">
+        <span class="logo-text">AutoFlow</span>
+      </a>
+            <nav class="main-nav">
+        <a href="index.html">HOME</a>
+        <a href="docs.html">DOCS</a>
+        </nav>
+      <div class="header-actions">
+        <button id="google-login-btn-nav" class="btn btn-primary google-auth-btn" style="text-transform: uppercase; border: none; cursor: pointer;">Join Waitlist</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Section 2: Hero -->
+  <section class="hero" id="hero">
+    <div class="hero-bg-vignette"></div>
+    <div class="container hero-inner">
+      <div class="hero-content">
+        
+        <h1 class="hero-title" style="margin-bottom: 24px; font-size: 4.5rem; line-height: 1.1;">Deploy with<br>Precision<span style="color: var(--c-primary);">.</span></h1>
+        
+        <p class="hero-description" style="font-size: 1.125rem; color: var(--c-slate); margin-bottom: 48px; max-width: 90%; line-height: 1.6;">
+          AutoFlow takes your code and deploys it to your own servers. No vendor lock-in. No leaked keys. Just you, your infrastructure, and total control.
+        </p>
+        
+        <div class="hero-cta-group">
+          <button id="google-login-btn-hero" class="btn btn-primary google-auth-btn" style="display: flex; align-items: center; gap: 12px; cursor: pointer; background-color: #ffffff; color: #1f2126; border: none; border-radius: 8px; font-weight: 600; padding: 12px 24px; font-family: var(--f-sans);">
+            <svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+            Sign in with Google</button>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 48px; border-top: 1px solid var(--c-hairline); padding-top: 32px;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--c-slate)" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              <span style="font-family: var(--f-mono); font-size: 0.75rem; font-weight: 600; color: var(--c-bone); letter-spacing: 0.05em;">LOCAL-FIRST</span>
+            </div>
+            <p style="font-size: 0.75rem; color: var(--c-slate); line-height: 1.4;">Keys never leave your machine</p>
+          </div>
+          <div>
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--c-slate)" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+              <span style="font-family: var(--f-mono); font-size: 0.75rem; font-weight: 600; color: var(--c-bone); letter-spacing: 0.05em;">ZERO-CONFIG</span>
+            </div>
+            <p style="font-size: 0.75rem; color: var(--c-slate); line-height: 1.4;">Auto-detect, auto-setup, auto-deploy</p>
+          </div>
+          <div>
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--c-slate)" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              <span style="font-family: var(--f-mono); font-size: 0.75rem; font-weight: 600; color: var(--c-bone); letter-spacing: 0.05em;">ZERO-DOWNTIME</span>
+            </div>
+            <p style="font-size: 0.75rem; color: var(--c-slate); line-height: 1.4;">Old container stays live until new one is healthy</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="two-surfaces" style="position: relative; height: auto; padding-bottom: 60px; padding-top: 20px; width: 100%;">
+        
+        <!-- Background Monitor Surface (Laptop style) -->
+        <div class="surface instrument-panel" style="position: relative; height: auto; width: 100%; margin: 0; z-index: 1; border-bottom-left-radius: 0; border-bottom-right-radius: 0;">
+          <div class="panel-header">
+            <span class="panel-label">Dashboard</span>
+            <div class="window-controls">
+              <span></span><span></span><span></span>
+            </div>
+          </div>
+          <div class="showcase-mockup" style="padding: 0; height: auto;">
+            <img src="./Assets/Desktop/live_monitor.png" alt="AutoFlow Live Monitor" style="width: 100%; height: auto; display: block;">
+          </div>
+          <div style="height: 14px; background: #0a0b0e; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; margin-top: -2px; position: relative; z-index: 10; border-top: 1px solid #222; width: 106%; margin-left: -3%; box-shadow: 0 10px 30px rgba(0,0,0,0.8);">
+            <div style="width: 60px; height: 4px; background: #222; margin: 0 auto; border-radius: 0 0 4px 4px;"></div>
+          </div>
+        </div>
+
+        <!-- Foreground Terminal Surface -->
+        <div class="instrument-panel hero-terminal" style="position: absolute; right: -10%; bottom: -20px; width: 85%; z-index: 2; box-shadow: 0 40px 80px rgba(0,0,0,0.9);">
+          <div class="panel-header">
+            <span class="panel-label">Terminal</span>
+            <div class="panel-status-indicator pulse-signal"></div>
+          </div>
+          <div class="panel-body font-mono" style="padding: 16px; background: rgba(15, 17, 21, 0.95); backdrop-filter: blur(12px); max-height: 280px; overflow: hidden;">
+            <pre style="margin: 0; white-space: pre; font-size: 0.65rem; line-height: 1.3; overflow-x: hidden; color: var(--c-slate);">
+<span style="color: var(--c-bone);">PS D:\AUTOFLOW\website> autoflow</span>
+
+ <span style="color: #7dd3fc;">█████╗ ██╗   ██╗████████╗██████╗ ███████╗██╗      ██████╗ ██╗    ██╗</span>
+<span style="color: #38bdf8;">██╔══██╗██║   ██║╚══██╔══╝██╔══██╗██╔════╝██║     ██╔═══██╗██║    ██║</span>
+<span style="color: #0ea5e9;">███████║██║   ██║   ██║   ██║  ██║█████╗  ██║     ██║   ██║██║ █╗ ██║</span>
+<span style="color: #0284c7;">██╔══██║██║   ██║   ██║   ██║  ██║██╔══╝  ██║     ██║   ██║██║███╗██║</span>
+<span style="color: #0369a1;">██║  ██║╚██████╔╝   ██║   ██████╔╝██║     ███████╗╚██████╔╝╚███╔███╔╝</span>
+<span style="color: #075985;">╚═╝  ╚═╝ ╚═════╝    ╚═╝   ╚═════╝ ╚═╝     ╚══════╝ ╚═════╝  ╚══╝╚══╝</span>
+   <span style="color: #eab308;">(\_/)</span>
+   <span style="color: #eab308;">( •_•)</span>  <span style="color: #9ca3af;">AutoFlow Core v1.0.1</span>
+   <span style="color: #eab308;">/ >🚀</span>   <span style="color: #d946ef;">Ready to deploy your apps!</span>
+
+Usage: autoflow [options] [command]
+
+Automated CI/CD CLI tool for students and beginners
+
+Options:
+  -V, --version   output the version number
+  -h, --help      display help for command
+
+Commands:
+  setup           Configure global server details and security vault
+  init            Initialize a new deployment configuration
+  deploy          Deploy the current project to the remote server
+  status          Check the status of the deployed application
+  stop            Stop the running application on the server
+  help [command]  display help for command
+</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- Section 3: The Problem -->
+  <section class="problem section-divider" id="problem">
+    <div class="container">
+      <div class="split-panel">
+        <div class="problem-copy">
+          <span class="section-label font-mono">01 // The Problem</span>
+          <h2>Deployment doesn't have to be a fragile script.</h2>
+          <p class="text-slate">
+            Scattered SSH keys, manual VPS provisioning, sprawling Docker configurations, and the constant fear of breaking production. Current deployment tools lock you into expensive platforms or force you to maintain brittle shell scripts.
+          </p>
+        </div>
+        <div class="problem-diagram instrument-panel" style="padding: 40px; position: relative; min-height: 360px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+          
+          <!-- Decorative Background Grid -->
+          <div style="position: absolute; inset: 0; background-image: radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px); background-size: 20px 20px;"></div>
+
+          <div style="position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; z-index: 2;">
+            
+            <!-- Top Nodes -->
+            <div style="display: flex; gap: 48px; margin-bottom: 40px; width: 100%; justify-content: center;">
+              <div style="padding: 12px 16px; border: 1px solid rgba(239,68,68,0.3); background: rgba(239,68,68,0.05); border-radius: 6px; font-family: var(--f-mono); font-size: 0.75rem; color: #ef4444; display: flex; align-items: center; gap: 8px; position: relative;">
+                <div style="width: 6px; height: 6px; background: #ef4444; border-radius: 50%; box-shadow: 0 0 10px #ef4444;"></div>
+                VPS-01
+                <!-- Line down -->
+                <div style="position: absolute; bottom: -41px; left: 50%; width: 1px; height: 40px; background: rgba(239,68,68,0.3);"></div>
+              </div>
+              
+              <div style="padding: 12px 16px; border: 1px solid rgba(234,179,8,0.3); background: rgba(234,179,8,0.05); border-radius: 6px; font-family: var(--f-mono); font-size: 0.75rem; color: #eab308; display: flex; align-items: center; gap: 8px; position: relative;">
+                <div style="width: 6px; height: 6px; background: #eab308; border-radius: 50%; box-shadow: 0 0 10px #eab308;"></div>
+                DB_CLUSTER
+                <!-- Line down -->
+                <div style="position: absolute; bottom: -41px; left: 50%; width: 1px; height: 40px; background: rgba(234,179,8,0.3);"></div>
+              </div>
+            </div>
+
+            <!-- Horizontal connector bus -->
+            <div style="width: 160px; height: 1px; background: linear-gradient(90deg, rgba(239,68,68,0.3), rgba(234,179,8,0.3)); margin-bottom: 40px; position: relative;">
+              <!-- Line down to script -->
+              <div style="position: absolute; top: 0; left: 50%; width: 1px; height: 40px; background: rgba(234,179,8,0.3);"></div>
+            </div>
+
+            <!-- Central Problem Node -->
+            <div style="padding: 16px 24px; border: 1px solid rgba(234,179,8,0.4); background: rgba(234,179,8,0.1); border-radius: 8px; font-family: var(--f-mono); font-size: 0.85rem; color: #eab308; display: flex; flex-direction: column; align-items: center; gap: 12px; z-index: 10; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              <span style="letter-spacing: 0.05em; font-weight: 600;">MANUAL DEPLOY SCRIPT</span>
+            </div>
+
+            <!-- Line down to error -->
+            <div style="width: 1px; height: 40px; background: rgba(239,68,68,0.4);"></div>
+
+            <!-- Fatal Error -->
+            <div style="padding: 12px 24px; border: 1px dashed rgba(239,68,68,0.6); background: transparent; border-radius: 6px; font-family: var(--f-mono); font-size: 0.75rem; color: #ef4444; letter-spacing: 0.1em; font-weight: 600;">
+              CONNECTION TIMEOUT
+            </div>
+            
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 4: Features -->
+  <section class="features section-divider" id="features">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-label font-mono">02 // Features</span>
+        <h2>Engineered for control.</h2>
+      </div>
+      
+      <div class="features-grid">
+        <div class="feature-card instrument-panel" style="display: flex; gap: 24px; align-items: flex-start; padding: 32px;">
+          <div style="flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--c-primary);">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 12H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><line x1="6" x2="6.01" y1="16" y2="16"/><line x1="10" x2="10.01" y1="16" y2="16"/></svg>
+          </div>
+          <div>
+            <h3 style="margin-top: 0;">Local First</h3>
+            <p class="text-slate" style="margin-bottom: 0;">No cloud dependencies. Your deployment configurations live with your codebase.</p>
+          </div>
+        </div>
+        <div class="feature-card instrument-panel" style="display: flex; gap: 24px; align-items: flex-start; padding: 32px;">
+          <div style="flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--c-primary);">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2.97 12.92A2 2 0 0 0 2 14.63v3.24a2 2 0 0 0 .97 1.71l3 1.8a2 2 0 0 0 2.06 0L12 19v-5.5l-5-3-4.03 2.42z"/><path d="m7 16.5-4.74-2.85"/><path d="m7 16.5 5-3"/><path d="M7 16.5v5.17"/><path d="M12 13.5V19l3.97 2.38a2 2 0 0 0 2.06 0l3-1.8a2 2 0 0 0 .97-1.71v-3.24a2 2 0 0 0-.97-1.71L17 10.5l-5 3z"/><path d="m17 16.5-5-3"/><path d="m17 16.5 4.74-2.85"/><path d="M17 16.5v5.17"/><path d="M7.97 4.42A2 2 0 0 0 7 6.13v4.37l5 3 5-3V6.13a2 2 0 0 0-.97-1.71l-3-1.8a2 2 0 0 0-2.06 0l-3 1.8z"/><path d="M12 8 7.26 5.15"/><path d="m12 8 4.74-2.85"/><path d="M12 13.5V8"/></svg>
+          </div>
+          <div>
+            <h3 style="margin-top: 0;">Zero Config</h3>
+            <p class="text-slate" style="margin-bottom: 0;">AutoFlow detects your framework and generates the optimal deployment strategy.</p>
+          </div>
+        </div>
+        <div class="feature-card instrument-panel" style="display: flex; gap: 24px; align-items: flex-start; padding: 32px;">
+          <div style="flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--c-primary);">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          </div>
+          <div>
+            <h3 style="margin-top: 0;">Zero Downtime</h3>
+            <p class="text-slate" style="margin-bottom: 0;">Rolling updates and automatic traffic routing ensure your application never drops a request.</p>
+          </div>
+        </div>
+        <!-- Vault Spec Sheet Component -->
+        <div class="feature-card instrument-panel feature-card-wide vault-spec-sheet" style="display: flex; gap: 24px; align-items: flex-start; padding: 32px;">
+          <div style="flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--c-primary);">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="16" r="1"/><rect x="3" y="10" width="18" height="12" rx="2"/><path d="M7 10V7a5 5 0 0 1 10 0v3"/></svg>
+          </div>
+          <div style="flex: 1;">
+            <h3 style="margin-top: 0;">Secure Vault</h3>
+            <p class="text-slate">End-to-end encrypted secrets management. Never paste an environment variable in plaintext again.</p>
+            <div class="spec-grid font-mono">
+              <div class="spec-item"><span>Encryption</span><span>AES-256-GCM</span></div>
+              <div class="spec-item"><span>Key Exchange</span><span>Ed25519</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="feature-card instrument-panel" style="display: flex; gap: 24px; align-items: flex-start; padding: 32px;">
+          <div style="flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--c-primary);">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>
+          </div>
+          <div>
+            <h3 style="margin-top: 0;">Automatic SSL</h3>
+            <p class="text-slate" style="margin-bottom: 0;">Zero-touch TLS certificate provisioning and renewal via Let's Encrypt.</p>
+          </div>
+        </div>
+        <div class="feature-card instrument-panel" style="display: flex; gap: 24px; align-items: flex-start; padding: 32px;">
+          <div style="flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--c-primary);">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+          </div>
+          <div>
+            <h3 style="margin-top: 0;">Docker Automation</h3>
+            <p class="text-slate" style="margin-bottom: 0;">Seamless container lifecycle management without touching compose files.</p>
+          </div>
+        </div>
+        <div class="feature-card instrument-panel" style="display: flex; gap: 24px; align-items: flex-start; padding: 32px;">
+          <div style="flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--c-primary);">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+          </div>
+          <div>
+            <h3 style="margin-top: 0;">Instant Rollback</h3>
+            <p class="text-slate" style="margin-bottom: 0;">Revert to any previous release in milliseconds with a single command.</p>
+          </div>
+        </div>
+        <div class="feature-card instrument-panel" style="display: flex; gap: 24px; align-items: flex-start; padding: 32px;">
+          <div style="flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--c-primary);">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+          </div>
+          <div>
+            <h3 style="margin-top: 0;">Deployment Logs</h3>
+            <p class="text-slate" style="margin-bottom: 0;">Stream real-time build and container logs directly to your dashboard.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 5: Product Showcase -->
+  <section class="showcase section-divider" id="showcase">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-label font-mono">03 // The Interface</span>
+        <h2>Mission control for your infrastructure.</h2>
+      </div>
+      
+      <!-- Two Surfaces Component (Desktop App + CLI) -->
+      <div class="two-surfaces">
+        <div class="surface desktop-surface instrument-panel" style="height: auto;">
+          <div class="panel-header">
+            <span class="panel-label">AutoFlow Desktop</span>
+            <div class="window-controls">
+              <span></span><span></span><span></span>
+            </div>
+          </div>
+          <div class="showcase-mockup desktop-mockup" style="padding: 0; height: auto;">
+            <img src="./Assets/Desktop/Dashboard.png" alt="AutoFlow Dashboard" style="width: 100%; height: auto; display: block; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;">
+          </div>
+        </div>
+        
+        <div class="surface cli-surface instrument-panel">
+          <div class="panel-header">
+            <span class="panel-label">CLI</span>
+          </div>
+          <div class="showcase-mockup cli-mockup font-mono" style="padding: 16px; overflow: hidden;">
+            <pre style="margin: 0; font-family: inherit; font-size: 0.65rem; line-height: 1.3; color: var(--c-slate); white-space: pre;">
+<span style="color: var(--c-bone);">PS D:\AUTOFLOW\website&gt; autoflow</span>
+
+<span style="background: -webkit-linear-gradient(#7dd3fc, #075985); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;"> █████╗ ██╗   ██╗████████╗██████╗ ███████╗██╗      ██████╗ ██╗    ██╗
+██╔══██╗██║   ██║╚══██╔══╝██╔══██╗██╔════╝██║     ██╔═══██╗██║    ██║
+███████║██║   ██║   ██║   ██║  ██║█████╗  ██║     ██║   ██║██║ █╗ ██║
+██╔══██║██║   ██║   ██║   ██║  ██║██╔══╝  ██║     ██║   ██║██║███╗██║
+██║  ██║╚██████╔╝   ██║   ██████╔╝██║     ███████╗╚██████╔╝╚███╔███╔╝
+╚═╝  ╚═╝ ╚═════╝    ╚═╝   ╚═════╝ ╚═╝     ╚══════╝ ╚═════╝  ╚══╝╚══╝</span>
+   <span style="color: #eab308;">(\_/)</span>
+   <span style="color: #eab308;">( •_•)</span>  <span style="color: #94a3b8;">AutoFlow Core v1.0.1</span>
+   <span style="color: #eab308;">/ &gt;🚀</span>   <span style="color: #d946ef;">Ready to deploy your apps!</span>
+
+Usage: autoflow [options] [command]
+
+Automated CI/CD CLI tool for students and beginners
+
+Options:
+  -V, --version   output the version number
+  -h, --help      display help for command
+
+Commands:
+  setup           Configure global server details and security vault
+  init            Initialize a new deployment configuration
+  deploy          Deploy the current project to the remote server
+  status          Check the status of the deployed application
+  stop            Stop the running application on the server
+  help [command]  display help for command</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 6: How It Works -->
+  <section class="how-it-works section-divider" id="how-it-works">
+    <div class="container">
+      <div class="section-header center">
+        <span class="section-label font-mono">04 // Workflow</span>
+        <h2>The Deployment Sequence.</h2>
+      </div>
+      
+      <!-- Deploy Sequence Panel Component -->
+      <div class="deploy-sequence-panel instrument-panel">
+        <div class="panel-header">
+          <span class="panel-label">Deploy Engine Sequence</span>
+          <div class="panel-status-indicator pulse-signal"></div>
+        </div>
+        <div class="sequence-track">
+          <div class="sequence-stage active">
+            <div class="stage-box">
+              <div class="stage-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg></div>
+              <span class="stage-name font-mono">Start Deploy</span>
+            </div>
+          </div>
+          <div class="sequence-stage">
+            <div class="stage-box">
+              <div class="stage-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg></div>
+              <span class="stage-name font-mono">Load Config</span>
+            </div>
+          </div>
+          <div class="sequence-stage">
+            <div class="stage-box">
+              <div class="stage-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg></div>
+              <span class="stage-name font-mono">Local CI</span>
+            </div>
+          </div>
+          <div class="sequence-stage">
+            <div class="stage-box">
+              <div class="stage-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="18" r="3"></circle><circle cx="6" cy="6" r="3"></circle><circle cx="18" cy="18" r="3"></circle><line x1="6" y1="9" x2="6" y2="15"></line><path d="M18 15v-1a3 3 0 0 0-3-3H9"></path></svg></div>
+              <span class="stage-name font-mono">Git Sync</span>
+            </div>
+          </div>
+          <div class="sequence-stage">
+            <div class="stage-box">
+              <div class="stage-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path></svg></div>
+              <span class="stage-name font-mono">Remote CI</span>
+            </div>
+          </div>
+          <div class="sequence-stage">
+            <div class="stage-box">
+              <div class="stage-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg></div>
+              <span class="stage-name font-mono">SSH Connect</span>
+            </div>
+          </div>
+          <div class="sequence-stage">
+            <div class="stage-box">
+              <div class="stage-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="9" x2="20" y2="9"></line><line x1="4" y1="15" x2="20" y2="15"></line><line x1="10" y1="3" x2="8" y2="21"></line><line x1="16" y1="3" x2="14" y2="21"></line></svg></div>
+              <span class="stage-name font-mono">Port Alloc</span>
+            </div>
+          </div>
+          <div class="sequence-stage">
+            <div class="stage-box">
+              <div class="stage-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg></div>
+              <span class="stage-name font-mono">Pull Code</span>
+            </div>
+          </div>
+          <div class="sequence-stage">
+            <div class="stage-box">
+              <div class="stage-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg></div>
+              <span class="stage-name font-mono">Backup</span>
+            </div>
+          </div>
+          <div class="sequence-stage">
+            <div class="stage-box">
+              <div class="stage-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg></div>
+              <span class="stage-name font-mono">Build Image</span>
+            </div>
+          </div>
+          <div class="sequence-stage">
+            <div class="stage-box">
+              <div class="stage-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"></path><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"></path><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"></path><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"></path></svg></div>
+              <span class="stage-name font-mono">Start App</span>
+            </div>
+          </div>
+          <div class="sequence-stage">
+            <div class="stage-box">
+              <div class="stage-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg></div>
+              <span class="stage-name font-mono">Health Check</span>
+            </div>
+          </div>
+          <div class="sequence-stage">
+            <div class="stage-box">
+              <div class="stage-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></div>
+              <span class="stage-name font-mono">Nginx Config</span>
+            </div>
+          </div>
+          <div class="sequence-stage">
+            <div class="stage-box">
+              <div class="stage-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></div>
+              <span class="stage-name font-mono">SSL Cert</span>
+            </div>
+          </div>
+          <div class="sequence-stage">
+            <div class="stage-box">
+              <div class="stage-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg></div>
+              <span class="stage-name font-mono">Live Site</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <!-- Section 6.5: Security Vault -->
+  <section class="local-vault section-divider" id="security">
+    <div class="container">
+      <div class="section-header center">
+        <span class="section-label font-mono">04.5 // Security</span>
+        <h2>Decoupled Local Vault.</h2>
+        <p class="text-slate" style="max-width: 800px; margin: 16px auto 0;">
+          All SSH keys, deployment tokens, and environment variables are heavily encrypted (AES-256-GCM) and stored locally on your hard drive. There is no central point of failure. Your credentials are never exposed to the public internet or stored on third-party servers. You own your infrastructure absolutely.
+        </p>
+      </div>
+      
+      <div class="two-surfaces" style="position: relative; height: auto; padding-bottom: 60px; margin-top: 48px;">
+        <!-- Desktop Surface -->
+        <div class="surface instrument-panel" style="position: relative; height: auto; width: 85%; margin: 0; z-index: 1;">
+          <div class="panel-header">
+            <span class="panel-label">AutoFlow Security Vault</span>
+            <div class="window-controls">
+              <span></span><span></span><span></span>
+            </div>
+          </div>
+          <div class="showcase-mockup" style="padding: 0; height: auto;">
+            <img src="./Assets/Desktop/Vault_common_login_screen.png" alt="AutoFlow Security Vault" style="width: 100%; height: auto; display: block; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;">
+          </div>
+        </div>
+        
+        <!-- Mobile Surface -->
+        <div class="surface mobile-surface" style="position: absolute; right: 0; bottom: 0; width: 230px; z-index: 2; padding: 0; border-radius: 32px; overflow: hidden; border: 8px solid var(--c-panel); box-shadow: 0 40px 80px rgba(0,0,0,0.9); background: var(--c-graphite);">
+          <!-- Phone Notch -->
+          <div style="position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 100px; height: 20px; background: var(--c-panel); border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; z-index: 10;"></div>
+          
+          <!-- SafeAuth Image -->
+          <img src="./Assets/Desktop/safeAuth.png" alt="SafeAuth OTP" style="width: 100%; height: auto; display: block; border-radius: 24px;">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 7: Supported Technologies -->
+  <section class="technologies section-divider" id="technologies">
+    <div class="container">
+      <div class="section-header center">
+        <span class="section-label font-mono">05 // Ecosystem</span>
+        <h2>Native Support.</h2>
+      </div>
+      
+      <div class="tech-grid" style="display: flex; flex-wrap: wrap; justify-content: center; max-width: 1000px; margin: 0 auto; gap: 16px;">
+        <div class="tech-badge font-mono">
+          <img src="https://cdn.simpleicons.org/nodedotjs/8B8D93" alt="Node.js" class="tech-icon">
+          <span>Node.js</span>
+        </div>
+        <div class="tech-badge font-mono">
+          <img src="https://cdn.simpleicons.org/go/8B8D93" alt="Go" class="tech-icon">
+          <span>Go</span>
+        </div>
+        <div class="tech-badge font-mono">
+          <img src="https://api.iconify.design/cib/java.svg?color=%238B8D93" alt="Java" class="tech-icon">
+          <span>Java</span>
+        </div>
+        <div class="tech-badge font-mono">
+          <img src="https://cdn.simpleicons.org/rubyonrails/8B8D93" alt="Rails" class="tech-icon">
+          <span>Rails</span>
+        </div>
+        <div class="tech-badge font-mono">
+          <img src="https://cdn.simpleicons.org/ruby/8B8D93" alt="Ruby" class="tech-icon">
+          <span>Ruby</span>
+        </div>
+        <div class="tech-badge font-mono">
+          <img src="https://cdn.simpleicons.org/django/8B8D93" alt="Django" class="tech-icon">
+          <span>Django</span>
+        </div>
+        <div class="tech-badge font-mono">
+          <img src="https://cdn.simpleicons.org/flask/8B8D93" alt="Flask" class="tech-icon">
+          <span>Flask</span>
+        </div>
+        <div class="tech-badge font-mono">
+          <img src="https://cdn.simpleicons.org/python/8B8D93" alt="Python" class="tech-icon">
+          <span>Python</span>
+        </div>
+        <div class="tech-badge font-mono">
+          <img src="https://cdn.simpleicons.org/php/8B8D93" alt="PHP" class="tech-icon">
+          <span>PHP</span>
+        </div>
+        <div class="tech-badge font-mono">
+          <img src="https://cdn.simpleicons.org/nextdotjs/8B8D93" alt="Next.js" class="tech-icon">
+          <span>Next.js</span>
+        </div>
+        <div class="tech-badge font-mono">
+          <img src="https://cdn.simpleicons.org/nuxt/8B8D93" alt="Nuxt.js" class="tech-icon">
+          <span>Nuxt.js</span>
+        </div>
+        <div class="tech-badge font-mono">
+          <img src="https://cdn.simpleicons.org/vuedotjs/8B8D93" alt="Vue" class="tech-icon">
+          <span>Vue</span>
+        </div>
+        <div class="tech-badge font-mono">
+          <img src="https://cdn.simpleicons.org/vite/8B8D93" alt="Vite" class="tech-icon">
+          <span>Vite</span>
+        </div>
+        <div class="tech-badge font-mono">
+          <img src="https://cdn.simpleicons.org/react/8B8D93" alt="React" class="tech-icon">
+          <span>React</span>
+        </div>
+        <div class="tech-badge font-mono">
+          <img src="https://cdn.simpleicons.org/angular/8B8D93" alt="Angular" class="tech-icon">
+          <span>Angular</span>
+        </div>
+        <div class="tech-badge font-mono">
+          <img src="https://cdn.simpleicons.org/html5/8B8D93" alt="HTML5" class="tech-icon">
+          <span>Static HTML</span>
+        </div>
+        <div class="tech-badge font-mono">
+          <img src="https://cdn.simpleicons.org/docker/8B8D93" alt="Docker" class="tech-icon">
+          <span>Docker</span>
+        </div>
+        <div class="tech-badge font-mono">
+          <img src="https://cdn.simpleicons.org/nginx/8B8D93" alt="Nginx" class="tech-icon">
+          <span>Nginx</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 8: CLI -->
+  <section class="cli-section section-divider instrument-panel" id="cli" style="border-left: none; border-right: none; padding: 0;">
+    <div style="width: 100%; padding: 0 4%;">
+      <div class="cli-container" style="border: none; background: transparent; padding: 64px 0;">
+        <div class="cli-info">
+          <h2>Zero dependencies.</h2>
+          <p class="text-slate">The CLI is bundled with the Desktop application. No Node.js, no npm, zero setup required. Install the app, and you're ready to deploy from any terminal.</p>
+        </div>
+        <div class="cli-code font-mono" style="padding-left: 48px; display: flex; align-items: center; justify-content: center; width: 100%;">
+          <img src="./Assets/CLI/image.png" alt="AutoFlow CLI Action" style="width: 100%; max-width: 900px; border: 1px solid var(--c-hairline); border-radius: 8px; box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 10: FAQ -->
+  <section class="faq section-divider" id="faq">
+    <div class="container faq-container">
+      <div class="section-header">
+        <span class="section-label font-mono">07 // Knowledge Base</span>
+        <h2>Frequently Asked Questions.</h2>
+      </div>
+      
+      <div class="faq-accordion">
+        <div class="faq-item">
+          <button class="faq-question">
+            <span>Does AutoFlow require an agent on my server?</span>
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-answer">
+            <p class="text-slate">No. AutoFlow communicates exclusively via SSH, just like you would. There is no proprietary agent running on your hardware.</p>
+          </div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-question">
+            <span>Can I deploy to any VPS provider?</span>
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-answer">
+            <p class="text-slate">Yes. If you have root SSH access to an Ubuntu/Debian machine, AutoFlow can provision and deploy to it. DigitalOcean, Hetzner, AWS, Linode, it all works.</p>
+          </div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-question">
+            <span>What happens if AutoFlow goes down?</span>
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-answer">
+            <p class="text-slate">Nothing. AutoFlow configures standard open-source tools (Docker, Nginx) on your server. Your apps stay online even if AutoFlow's services are unreachable.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 11: Final CTA -->
+  <section class="final-cta section-divider" id="install">
+    <div class="container">
+      <div class="cta-grid" style="display: grid; grid-template-columns: 1fr; gap: 24px;">
+        <div class="cta-card instrument-panel" style="padding: 64px 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+          <div style="max-width: 600px; margin: 0 auto;">
+            <h2 style="margin-bottom: 16px; font-size: 2.5rem;">Join the Waitlist</h2>
+            <p class="text-slate" style="font-size: 1.125rem; margin-bottom: 40px;">
+              AutoFlow is currently in private beta. Sign in with your Google account to reserve your spot in line and get early access.
+            </p>
+          </div>
+          <button id="google-login-btn-hero" class="btn btn-primary google-auth-btn" style="display: flex; align-items: center; gap: 12px; cursor: pointer; background-color: #ffffff; color: #1f2126; border: none; font-weight: 600; padding: 12px 32px; font-family: var(--f-sans); border-radius: 8px;">
+            <svg viewBox="0 0 24 24" width="24" height="24" xmlns="http://www.w3.org/2000/svg"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+            Sign in with Google</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 12: Footer -->
+    <!-- Section 12: Footer -->
+  <footer class="site-footer" style="border-top: 1px solid var(--c-hairline); padding: 64px 0 32px 0; background: transparent;">
+    <div class="container" style="max-width: var(--max-width); margin: 0 auto; display: grid; grid-template-columns: 1fr 2fr; gap: 64px;">
+      <!-- Left side: AutoFlow branding -->
+      <div style="display: flex; flex-direction: column; gap: 24px;">
+        <div style="display: flex; align-items: center; gap: 16px;">
+          <img src="Assets/icon-1.png" alt="AutoFlow Icon" style="height: 40px; width: 40px; object-fit: contain; border-radius: 10px; background-color: var(--c-panel); box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1);">
+          <span style="font-family: var(--f-heading); font-size: 1.5rem; font-weight: 800; color: var(--c-bone); letter-spacing: -0.03em;">AutoFlow</span>
+        </div>
+        <p style="color: var(--c-slate); font-size: 0.95rem; line-height: 1.6; max-width: 300px;">
+          The local-first deployment engine. Orchestrate your applications with military-grade precision, zero cloud dependencies.
+        </p>
+      </div>
+
+      <!-- Right side: Links and System -->
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px;">
+        <!-- Resources -->
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+          <h4 style="color: var(--c-bone); font-family: var(--f-mono); font-size: 0.85rem; letter-spacing: 0.1em; margin: 0;">RESOURCES</h4>
+          <a href="docs.html" class="footer-link">Documentation</a>
+          <a href="#" class="footer-link">Changelog</a>
+          </div>
+        <!-- Legal -->
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+          <h4 style="color: var(--c-bone); font-family: var(--f-mono); font-size: 0.85rem; letter-spacing: 0.1em; margin: 0;">LEGAL</h4>
+          <a href="privacy.html" class="footer-link">Privacy Policy</a>
+          <a href="terms.html" class="footer-link">Terms of Service</a>
+        </div>
+        <!-- System -->
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+          <h4 style="color: var(--c-bone); font-family: var(--f-mono); font-size: 0.85rem; letter-spacing: 0.1em; margin: 0;">SYSTEM</h4>
+          <span style="color: var(--c-slate); font-size: 0.9rem;">v1.2.4-stable</span>
+          <span style="color: var(--c-slate); font-size: 0.9rem;">&copy; 2026</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom edge: PrimeTech Logo -->
+    <div class="container" style="max-width: var(--max-width); margin: 64px auto 0 auto; padding-top: 32px; border-top: 1px solid var(--c-hairline); display: flex; justify-content: space-between; align-items: center;">
+      <span style="color: var(--c-slate); font-size: 0.85rem; font-family: var(--f-mono);">Engineered by</span>
+      
+      <div style="display: flex; align-items: center; gap: 14px;">
+        <img src="Assets/p-logo.png" alt="PrimeTech Logo" style="height: 48px; width: auto;">
+        <div style="display: flex; flex-direction: column; justify-content: center; transform: translateY(2px);">
+          <div style="font-family: var(--f-heading); font-weight: 800; font-size: 28px; line-height: 0.95; letter-spacing: -0.5px;">
+            <span style="color: var(--c-bone);">Prime</span><span style="color: var(--c-primary);">Tech</span>
+          </div>
+          <div style="font-family: var(--f-body); font-weight: 700; color: var(--c-slate); font-size: 10px; letter-spacing: 2.8px; line-height: 1; margin-top: 4px;">
+            DIGITAL SOLUTIONS
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px; width: 100%;">
+            <div style="flex-grow: 1; height: 1px; background-color: var(--c-primary);"></div>
+            <div style="font-family: var(--f-body); font-weight: 700; color: var(--c-slate); font-size: 7px; letter-spacing: 0.5px; line-height: 1; white-space: nowrap;">
+              TECHNOLOGY YOU CAN TRUST
+            </div>
+            <div style="flex-grow: 1; height: 1px; background-color: var(--c-primary);"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <div class="floating-actions">
+
+    <button class="float-btn scroll-to-top" title="Scroll to Top">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>
+    </button>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="main.js"></script>
+  <script src="waitlist.js"></script>
+</body>
+</html>
