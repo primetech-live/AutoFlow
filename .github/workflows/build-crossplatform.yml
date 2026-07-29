@@ -190,12 +190,16 @@ jobs:
           git config --global user.email "ci@autoflow.tech"
           git config --global user.name "AutoFlow CI"
           git clone https://x-access-token:${GIT_TOKEN}@github.com/primetech-live/Autoflow-Release.git public-repo
+      - name: Debug artefact layout
+        run: |
+          echo "=== Collected artefacts directory tree ==="
+          ls -R collected-artifacts
       - name: Copy binaries to public repo
         run: |
           mkdir -p public-repo/release
           find collected-artifacts -type f -exec cp -t public-repo/release {} +
-          echo "=== Files in public-repo/release after copy ==="
-          ls -R public-repo/release
+          echo "=== Files now in public-repo/release ==="
+          ls -l public-repo/release
       - name: Commit & push binaries
         run: |
           cd public-repo
