@@ -96,6 +96,7 @@ jobs:
           git clone https://x-access-token:${GIT_TOKEN}@github.com/primetech-live/Autoflow-Release.git public-repo
       - name: Copy binaries to public repo
         run: |
+          mkdir -p public-repo/release
           cp -r collected-artifacts/* public-repo/release/
       - name: Commit & push binaries
         run: |
