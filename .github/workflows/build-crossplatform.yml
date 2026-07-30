@@ -71,7 +71,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
       - name: Upload Build Artifacts
-        if: github.ref_type == 'tag'
         uses: actions/upload-artifact@v4
         with:
           name: autoflow-package-${{ matrix.os }}
@@ -91,6 +90,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: collected-artifacts
+          merge-multiple: true
       - name: Set up Git LFS
         run: |
           sudo apt-get update && sudo apt-get install -y git-lfs
