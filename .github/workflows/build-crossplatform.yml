@@ -62,14 +62,16 @@ jobs:
           echo "${{ github.ref_name }}-${{ github.sha }}" > release/VERSION
           npm run dist -- ${{ matrix.target_flag }} -p never
 
-      # On tag pushes: package AND publish to primetech-live/Autoflow-Release (public repo)
-      - name: Package & Publish Release
+      # On tag pushes: package and upload artifacts
+      - name: Package & Upload (tag)
         if: github.ref_type == 'tag'
-        run: npm run dist -- ${{ matrix.target_flag }} -p always
+        run: |
+          mkdir -p release
+          npm run dist -- ${{ matrix.target_flag }} -p always
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-
       - name: Upload Build Artifacts
+        if: github.ref_type == 'tag'
         uses: actions/upload-artifact@v4
         with:
           name: autoflow-package-${{ matrix.os }}
@@ -80,16 +82,19 @@ jobs:
             release/*.deb
           if-no-files-found: ignore
 
-
-  # ─── Stage 3: Publish binaries to public repo ───────────────────────────────
+  # Stage 3: Publish binaries to public repo using Git LFS
   publish-binaries:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Download all build artefacts
+      - name: Download build artefacts
         uses: actions/download-artifact@v4
         with:
-          path: ./collected-artifacts
+          path: collected-artifacts
+      - name: Set up Git LFS
+        run: |
+          sudo apt-get update && sudo apt-get install -y git-lfs
+          git lfs install
       - name: Clone public releases repo
         env:
           GIT_TOKEN: ${{ secrets.RELEASE_TOKEN }}
@@ -97,28 +102,20 @@ jobs:
           git config --global user.email "ci@autoflow.tech"
           git config --global user.name "AutoFlow CI"
           git clone https://x-access-token:${GIT_TOKEN}@github.com/primetech-live/Autoflow-Release.git public-repo
-      - name: Debug artefact layout
-        run: |
-          echo "=== Collected artefacts directory tree ==="
-          ls -R collected-artifacts
       - name: Copy binaries to public repo
         run: |
           mkdir -p public-repo/release
           find collected-artifacts -type f -exec cp -t public-repo/release {} +
-      - name: List copied files
+      - name: Track binaries with Git LFS
         run: |
-          echo "=== Files now in public-repo/release ==="
-          ls -l public-repo/release
-      - name: Set remote with token (ensure push auth)
+          cd public-repo
+          git lfs track "release/*"
+          git add .gitattributes
+      - name: Commit & push binaries
         env:
           GIT_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           cd public-repo
-          git remote set-url origin https://x-access-token:${GIT_TOKEN}@github.com/primetech-live/Autoflow-Release.git
-      - name: Commit & push binaries
-        run: |
-          cd public-repo
-          # version marker already created in package step for tags, ensure VERSION exists
           git add -A
           echo "=== git status before commit ==="
           git status -s
