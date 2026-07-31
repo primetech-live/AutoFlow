@@ -115,16 +115,26 @@ jobs:
         env:
           GIT_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
-          cd public-repo
-           git add -A
-           echo "=== git status before commit ==="
-           git status -s
-           git commit -m "chore: publish binaries for ${{ github.ref_name }}" || echo "No changes to commit"
-           # Tag the release
-           git tag ${{ github.ref_name }}
-           # Push tag and commit
-           git push origin ${{ github.ref_name }}
-           git push
+            cd public-repo
+            # Only create a tag and push when this run is triggered by a tag
+            if [ "${{ github.ref_type }}" = "tag" ]; then
+              git add -A
+              echo "=== git status before commit ==="
+              git status -s
+              git commit -m "chore: publish binaries for ${{ github.ref_name }}" || echo "No changes to commit"
+              # Tag the release
+              git tag ${{ github.ref_name }}
+              # Push tag and commit
+              git push origin ${{ github.ref_name }}
+              git push
+            else
+              # For branch pushes, just commit binaries without tagging/pushing tags
+              git add -A
+              echo "=== git status before commit (branch) ==="
+              git status -s
+              git commit -m "chore: publish binaries for ${{ github.ref_name }}" || echo "No changes to commit"
+              git push
+            fi
 
 
 
