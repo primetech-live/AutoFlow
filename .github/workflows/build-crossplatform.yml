@@ -116,8 +116,17 @@ jobs:
           GIT_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           cd public-repo
-          git add -A
-          echo "=== git status before commit ==="
-          git status -s
-          git commit -m "chore: publish binaries for ${{ github.ref_name }}" || echo "No changes to commit"
-          git push
+           git add -A
+           echo "=== git status before commit ==="
+           git status -s
+           git commit -m "chore: publish binaries for ${{ github.ref_name }}" || echo "No changes to commit"
+           # Tag the release
+           git tag ${{ github.ref_name }}
+           git push origin ${{ github.ref_name }}
+           git push
+
+           # Create GitHub release using the tag
+           curl -X POST -H "Authorization: token ${{ secrets.RELEASE_TOKEN }}" \
+                -H "Accept: application/vnd.github+json" \
+                https://api.github.com/repos/primetech-live/Autoflow-Release/releases \
+                -d '{"tag_name":"${{ github.ref_name }}","name":"AutoFlow ${{ github.ref_name }}","body":"AutoFlow release ${{ github.ref_name }}","draft":false,"prerelease":false}'
