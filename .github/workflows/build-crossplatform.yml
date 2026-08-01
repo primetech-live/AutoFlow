@@ -3,30 +3,41 @@ name: AutoFlow CI/CD
 on:
   push:
     tags:
-      - 'v*'
-      - '*.*.*'
+      - "v*"
+      - "*.*.*"
+  workflow_dispatch:
 
 permissions:
   contents: write
 
+concurrency:
+  group: autoflow-release-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  # ─── Stage 1: Quality Gate ────────────────────────────────────────────────
   lint-and-test:
+    name: Quality Gate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
-      - run: npm install
-      - run: npm test
+          node-version: "22"
+          cache: "npm"
 
-  # ─── Stage 2: Cross-Platform Build ───────────────────────────────────────
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run tests
+        run: npm test
+
   build:
+    name: Build (${{ matrix.os }})
     needs: lint-and-test
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: windows-latest
@@ -35,46 +46,46 @@ jobs:
             target_flag: --linux
           - os: macos-latest
             target_flag: --mac
+
     runs-on: ${{ matrix.os }}
+
     steps:
       - uses: actions/checkout@v4
+
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "22"
+          cache: "npm"
 
       - name: Install Linux build dependencies
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libarchive-tools libopenjp2-7
 
-      - run: npm install
+      - name: Install dependencies
+        run: npm install
+
       - name: Sync version with tag
         if: github.ref_type == 'tag'
+        shell: bash
         run: |
-          TAG=${{ github.ref_name }}
-          VERSION=${TAG#v}
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
           echo "Setting package version to $VERSION"
-          npm version $VERSION --no-git-tag-version --allow-same-version
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
           npm install
-      - run: npm run build
 
-      # On branch pushes: just package locally, never publish
-      - name: Package (branch push — no publish)
-        if: github.ref_type != 'tag'
-        run: |
-          mkdir -p release
-          echo "${{ github.ref_name }}-${{ github.sha }}" > release/VERSION
-          npm run dist -- ${{ matrix.target_flag }} -p never
+      - name: Build
+        run: npm run build
 
-      # On tag pushes: package and upload artifacts
-      - name: Package & Upload (tag)
-        if: github.ref_type == 'tag'
+      - name: Package
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           mkdir -p release
           npm run dist -- ${{ matrix.target_flag }} -p always
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -86,20 +97,24 @@ jobs:
             release/*.deb
           if-no-files-found: ignore
 
-  # Stage 3: Publish binaries to public repo using Git LFS
   publish-binaries:
+    name: Publish Binaries
     needs: build
     runs-on: ubuntu-latest
+
     steps:
       - name: Download build artefacts
         uses: actions/download-artifact@v4
         with:
           path: collected-artifacts
           merge-multiple: true
+
       - name: Set up Git LFS
         run: |
-          sudo apt-get update && sudo apt-get install -y git-lfs
+          sudo apt-get update
+          sudo apt-get install -y git-lfs
           git lfs install
+
       - name: Clone public releases repo
         env:
           GIT_TOKEN: ${{ secrets.RELEASE_TOKEN }}
@@ -107,59 +122,47 @@ jobs:
           git config --global user.email "ci@autoflow.tech"
           git config --global user.name "AutoFlow CI"
           git clone https://x-access-token:${GIT_TOKEN}@github.com/primetech-live/Autoflow-Release.git public-repo
+
       - name: Clean old release assets
         run: |
           rm -rf public-repo/release/*
+          mkdir -p public-repo/release
+
       - name: Copy binaries to public repo
         run: |
-          mkdir -p public-repo/release
-          find collected-artifacts -type f -exec cp -t public-repo/release {} +
+          find collected-artifacts -type f -exec cp {} public-repo/release/ \;
+
       - name: Track binaries with Git LFS
         run: |
           cd public-repo
           git lfs track "release/*"
           git add .gitattributes
+
       - name: Commit & push binaries
-        env:
-          GIT_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        shell: bash
         run: |
-            cd public-repo
-            # Only create a tag and push when this run is triggered by a tag
-            if [ "${{ github.ref_type }}" = "tag" ]; then
-              git add -A
-              echo "=== git status before commit ==="
-              git status -s
-              git commit -m "chore: publish binaries for ${{ github.ref_name }}" || echo "No changes to commit"
-              # Tag the release
-              git tag ${{ github.ref_name }}
-              # Push tag and commit
-              git push origin ${{ github.ref_name }}
+          cd public-repo
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "chore: publish binaries for ${{ github.ref_name }}"
+          git push origin main
 
-            else
-              # For branch pushes, just commit binaries without tagging/pushing tags
-              git add -A
-              echo "=== git status before commit (branch) ==="
-              git status -s
-              git commit -m "chore: publish binaries for ${{ github.ref_name }}" || echo "No changes to commit"
-              git push
-            fi
-
-
-
-      # ---- Create GitHub Release ----
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
-          gh release create ${{ github.ref_name }} \
+          gh release create "${{ github.ref_name }}" \
             --repo primetech-live/Autoflow-Release \
             --title "AutoFlow ${{ github.ref_name }}" \
-            --notes "AutoFlow release ${{ github.ref_name }}"
+            --notes "AutoFlow release ${{ github.ref_name }}" \
+            --target main || echo "Release already exists"
 
-      # ---- Upload assets to the release ----
       - name: Upload release assets
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
-          gh release upload ${{ github.ref_name }} public-repo/release/* \
-            --repo primetech-live/Autoflow-Release
+          gh release upload "${{ github.ref_name }}" public-repo/release/* \
+            --repo primetech-live/Autoflow-Release --clobber
