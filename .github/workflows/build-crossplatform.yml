@@ -2,12 +2,11 @@ name: AutoFlow CI/CD
 
 on:
   push:
-    branches: [ main, beta ]
     tags:
       - 'v*'
       - '*.*.*'
-  pull_request:
-    branches: [ main, beta ]
+    branches:
+      - main
 
 permissions:
   contents: write
@@ -126,7 +125,7 @@ jobs:
               git tag ${{ github.ref_name }}
               # Push tag and commit
               git push origin ${{ github.ref_name }}
-              git push
+
             else
               # For branch pushes, just commit binaries without tagging/pushing tags
               git add -A
