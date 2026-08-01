@@ -5,8 +5,6 @@ on:
     tags:
       - 'v*'
       - '*.*.*'
-    branches:
-      - main
 
 permissions:
   contents: write
@@ -51,6 +49,14 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libarchive-tools libopenjp2-7
 
       - run: npm install
+      - name: Sync version with tag
+        if: github.ref_type == 'tag'
+        run: |
+          TAG=${{ github.ref_name }}
+          VERSION=${TAG#v}
+          echo "Setting package version to $VERSION"
+          npm version $VERSION --no-git-tag-version
+          npm install
       - run: npm run build
 
       # On branch pushes: just package locally, never publish
@@ -101,6 +107,9 @@ jobs:
           git config --global user.email "ci@autoflow.tech"
           git config --global user.name "AutoFlow CI"
           git clone https://x-access-token:${GIT_TOKEN}@github.com/primetech-live/Autoflow-Release.git public-repo
+      - name: Clean old release assets
+        run: |
+          rm -rf public-repo/release/*
       - name: Copy binaries to public repo
         run: |
           mkdir -p public-repo/release
