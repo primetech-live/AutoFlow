@@ -406,20 +406,6 @@ export const Settings: React.FC<SettingsProps> = ({ onReRunOnboarding, onResetCo
                                     <span className="text-secondary">Current Plan</span>
                                     <span style={{ fontWeight: 600, textTransform: 'capitalize' }}>{profile.plan || 'Free'}</span>
                                 </div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                    <span className="text-secondary">Projects Used</span>
-                                    <span style={{ fontWeight: 600 }}>
-                                        {projectCount} / {profile.plan === 'infinet' ? 'Unlimited' : (profile.plan === 'ultra' ? 15 : (profile.plan === 'pro' ? 5 : 1))}
-                                    </span>
-                                </div>
-                                {profile.plan !== 'infinet' && (
-                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <span className="text-secondary">Remaining Projects</span>
-                                        <span style={{ fontWeight: 600 }}>
-                                            {Math.max(0, (profile.plan === 'ultra' ? 15 : (profile.plan === 'pro' ? 5 : 1)) - projectCount)}
-                                        </span>
-                                    </div>
-                                )}
                             </div>
                         </div>
                     )}

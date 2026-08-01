@@ -181,7 +181,6 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
                 deploymentCount += (deployerEngine.getHistory(pName) || []).length;
             }
             await supabase.from('user_profiles').update({ 
-                project_count: projects.length,
                 deployment_count: deploymentCount
             }).eq('id', userId);
         }
@@ -321,38 +320,11 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
     });
 
     ipcMain.handle('projects:add', async (_, projectPath) => {
-        const userId = getCurrentUserId();
-        if (userId) {
-            const { data, error } = await supabase.from('user_profiles').select('project_count, plan').eq('id', userId).single();
-            if (data) {
-                let limit = 1;
-                switch (data.plan) {
-                    case 'free': limit = 1; break;
-                    case 'pro': limit = 5; break;
-                    case 'ultra': limit = 15; break;
-                    case 'infinet': limit = Infinity; break;
-                    default: limit = 1;
-                }
-                if (data.project_count >= limit) {
-                    throw new Error(`Plan limit reached: Maximum ${limit} project(s) allowed. Please upgrade.`);
-                }
-            }
-            if (!error) {
-                await supabase.from('user_profiles').update({ project_count: data.project_count + 1 }).eq('id', userId);
-            }
-        }
         addProjectToSaved(projectPath);
     });
 
     ipcMain.handle('projects:remove', async (_, projectPath) => {
         removeProjectFromSaved(projectPath);
-        const userId = getCurrentUserId();
-        if (userId) {
-            const { data } = await supabase.from('user_profiles').select('project_count').eq('id', userId).single();
-            if (data && data.project_count > 0) {
-                await supabase.from('user_profiles').update({ project_count: data.project_count - 1 }).eq('id', userId);
-            }
-        }
     });
 
     ipcMain.handle('projects:load-config', (_, projectPath) => {

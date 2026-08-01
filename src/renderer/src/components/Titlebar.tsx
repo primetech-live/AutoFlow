@@ -104,15 +104,9 @@ export const Titlebar: React.FC<TitlebarProps> = ({ isUnlocked, onLockClick }) =
                                     </div>
                                 </div>
                                 <div style={{ background: 'var(--bg-main)', padding: '10px', borderRadius: '6px', marginBottom: '16px', fontSize: '13px' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                         <span style={{ color: 'var(--text-secondary)' }}>Current Plan</span>
                                         <span style={{ fontWeight: 600, textTransform: 'capitalize' }}>{profile?.plan || 'Free'}</span>
-                                    </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <span style={{ color: 'var(--text-secondary)' }}>Projects</span>
-                                        <span style={{ fontWeight: 600 }}>
-                                            {projectCount} / {profile?.plan === 'infinet' ? 'Unlimited' : (profile?.plan === 'ultra' ? 15 : (profile?.plan === 'pro' ? 5 : 1))}
-                                        </span>
                                     </div>
                                 </div>
                                 <div style={{ display: 'flex', gap: '8px' }}>
