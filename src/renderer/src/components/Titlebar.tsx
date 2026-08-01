@@ -16,18 +16,7 @@ export const Titlebar: React.FC<TitlebarProps> = ({ isUnlocked, onLockClick }) =
 
     const { user, signOut } = useAuth();
     const [showPopover, setShowPopover] = useState(false);
-    const [profile, setProfile] = useState<any>(null);
-    const [projectCount, setProjectCount] = useState(0);
     const popoverRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        if (user && showPopover && !profile) {
-            window.autoflow.getUserProfile().then(setProfile);
-            window.autoflow.getSavedProjects().then((projects: any[]) => {
-                setProjectCount(projects ? projects.length : 0);
-            });
-        }
-    }, [user, showPopover, profile]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -103,16 +92,7 @@ export const Titlebar: React.FC<TitlebarProps> = ({ isUnlocked, onLockClick }) =
                                         </div>
                                     </div>
                                 </div>
-                                <div style={{ background: 'var(--bg-main)', padding: '10px', borderRadius: '6px', marginBottom: '16px', fontSize: '13px' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <span style={{ color: 'var(--text-secondary)' }}>Current Plan</span>
-                                        <span style={{ fontWeight: 600, textTransform: 'capitalize' }}>{profile?.plan || 'Free'}</span>
-                                    </div>
-                                </div>
-                                <div style={{ display: 'flex', gap: '8px' }}>
-                                    <button className="btn btn-primary" style={{ flex: 1, padding: '8px', fontSize: '12px' }}>
-                                        Upgrade
-                                    </button>
+                                <div style={{ display: 'flex' }}>
                                     <button onClick={signOut} className="btn btn-secondary" style={{ flex: 1, padding: '8px', fontSize: '12px' }}>
                                         Sign Out
                                     </button>
