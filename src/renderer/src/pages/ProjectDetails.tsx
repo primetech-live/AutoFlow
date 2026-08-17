@@ -619,7 +619,10 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
                                         value={appType}
                                         onChange={(e) => setAppType(e.target.value)}
                                     >
-                                        <option value="node">Node.js App (Next.js, Express)</option>
+                                        <option value="node">Node.js / Express</option>
+                                        <option value="next">Next.js</option>
+                                        <option value="laravel">Laravel Framework</option>
+                                        <option value="php">PHP App (Pure PHP)</option>
                                         <option value="static">Static Frontend (HTML, React Build)</option>
                                         <option value="python">Python API (FastAPI)</option>
                                         <option value="django">Python Django</option>

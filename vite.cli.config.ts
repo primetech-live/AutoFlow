@@ -14,9 +14,10 @@ export default defineConfig({
     },
     rollupOptions: {
       output: {
-        entryFileNames: 'cli.js'
+        entryFileNames: 'cli.js',
+        inlineDynamicImports: true
       },
-      // Exclude Node built-in modules & native binary C++ modules
+      // Only exclude built-in node modules and C++ binary addons
       external: [
         'child_process', 'crypto', 'events', 'fs', 'os', 'path', 'readline',
         'http', 'https', 'tls', 'net', 'dns', 'stream', 'util', 'zlib', 'assert', 'tty', 'url',
@@ -26,7 +27,7 @@ export default defineConfig({
     }
   },
   ssr: {
-    // Externalize native C++ modules so Rollup does not parse .node binary files
+    noExternal: true,
     external: ['ssh2', 'cpu-features']
   }
 });
