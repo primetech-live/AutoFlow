@@ -161,25 +161,43 @@ export async function initProjectCore(projectPath: string, options: InitOptions)
             }
         }
         if (appType === 'laravel') {
-            if (!suggestedVolumes.includes('/storage') && fs.existsSync(p('storage'))) {
-                suggestedVolumes.push('/storage');
-            }
-            if (fs.existsSync(p('public/uploads')) && !suggestedVolumes.includes('/public/uploads')) {
-                suggestedVolumes.push('/public/uploads');
-            }
-            if (fs.existsSync(p('public/assets/uploads')) && !suggestedVolumes.includes('/public/assets/uploads')) {
-                suggestedVolumes.push('/public/assets/uploads');
-            }
-        }
-        try {
-            const files = fs.readdirSync(projectPath);
-            for (const f of files) {
-                if ((f.endsWith('.sqlite') || f.endsWith('.db')) && !suggestedVolumes.includes(`/${f}`)) {
-                    suggestedVolumes.push(`/${f}`);
+            volumes = [
+                '/database',
+                '/storage',
+                '/public',
+                '/public/uploads',
+                '/public/assets/uploads'
+            ];
+        } else {
+            const suggestedVolumes: string[] = [];
+            const commonDataPaths = ['data', 'database', 'storage', 'uploads'];
+            for (const dataPath of commonDataPaths) {
+                if (dataPath === 'database') {
+                    // Only persist /database if SQLite or file-based DB is detected
+                    let isSqlite = false;
+                    try {
+                        const files = fs.readdirSync(p('database'));
+                        if (files.some(f => f.endsWith('.sqlite') || f.endsWith('.db'))) isSqlite = true;
+                    } catch {}
+                    if (fs.existsSync(p('.env'))) {
+                        const envContent = fs.readFileSync(p('.env'), 'utf-8');
+                        if (envContent.includes('DB_CONNECTION=sqlite')) isSqlite = true;
+                    }
+                    if (isSqlite && fs.existsSync(p('database'))) suggestedVolumes.push('/database');
+                } else if (fs.existsSync(p(dataPath))) {
+                    suggestedVolumes.push(`/${dataPath}`);
                 }
             }
-        } catch { /* ignore */ }
-        volumes = Array.from(new Set(suggestedVolumes));
+            try {
+                const files = fs.readdirSync(projectPath);
+                for (const f of files) {
+                    if ((f.endsWith('.sqlite') || f.endsWith('.db')) && !suggestedVolumes.includes(`/${f}`)) {
+                        suggestedVolumes.push(`/${f}`);
+                    }
+                }
+            } catch { /* ignore */ }
+            volumes = Array.from(new Set(suggestedVolumes));
+        }
     }
 
     /* ── Save config ─────────────────────────────────────────────────── */
@@ -383,8 +401,12 @@ export async function initProjectCore(projectPath: string, options: InitOptions)
         let ciWorkflow = '';
         const ciHeader = `name: CI\n\non:\n  push:\n    branches: [ main, master ]\n  pull_request:\n    branches: [ main, master ]\n\njobs:\n`;
 
+        // ── Laravel CI ──────────────────────────────────────────────────
+        if (appType === 'laravel') {
+            ciWorkflow = `${ciHeader}  ci:\n    name: Laravel Application CI\n    runs-on: ubuntu-latest\n\n    steps:\n      - name: Checkout code\n        uses: actions/checkout@v4\n\n      - name: Setup PHP\n        uses: shivammathur/setup-php@v2\n        with:\n          php-version: '8.2'\n          extensions: mbstring, dom, fileinfo, mysql, pdo, pdo_mysql, bcmath, ctype, json, openssl, tokenizer, xml\n          coverage: none\n\n      - name: Install Composer Dependencies\n        run: composer install --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist --optimize-autoloader\n\n      - name: Prepare Environment\n        run: |\n          cp .env.example .env 2>/dev/null || true\n          php artisan key:generate || true\n\n      - name: Check Dockerfile & Configuration\n        run: |\n          [ -f "Dockerfile" ] || { echo "❌ Dockerfile missing"; exit 1; }\n          [ -f "autoflow.config.json" ] || { echo "❌ autoflow.config.json missing"; exit 1; }\n          echo "✅ Laravel deployment assets verified"\n\n      - name: Run Tests\n        run: |\n          if [ -f "vendor/bin/phpunit" ]; then\n            vendor/bin/phpunit --no-coverage\n          elif [ -f "vendor/bin/pest" ]; then\n            vendor/bin/pest\n          else\n            echo "ℹ️ No test suite found, skipping test execution"\n          fi\n`;
+        }
         // ── PHP CI ──────────────────────────────────────────────────────
-        if (appType === 'php') {
+        else if (appType === 'php') {
             const composerStep = fs.existsSync(p('composer.json'))
                 ? `\n      - name: Install Composer dependencies\n        run: composer install --no-progress --prefer-dist --optimize-autoloader`
                 : '';
