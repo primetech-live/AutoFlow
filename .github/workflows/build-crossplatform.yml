@@ -106,7 +106,7 @@ jobs:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           mkdir -p release
-          npm run dist -- ${{ matrix.target_flag }} -p always
+          npm run dist -- ${{ matrix.target_flag }} -p never
 
       - name: Direct Publish Executables to Autoflow-Release Repo
         shell: bash
