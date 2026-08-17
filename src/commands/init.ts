@@ -361,7 +361,17 @@ exec "$@"
           if (!providerContent.includes('use Illuminate\\Support\\Facades\\URL;')) {
             providerContent = providerContent.replace(/(namespace\s+App\\Providers;)/, `$1\n\nuse Illuminate\\Support\\Facades\\URL;`);
           }
-          const snippet = `\n        if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {\n            URL::forceScheme('https');\n        }\n`;
+          const snippet = `
+        if (
+            request()->header('x-forwarded-proto') === 'https' ||
+            (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') ||
+            (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ||
+            str_starts_with(config('app.url'), 'https://') ||
+            (request()->server('HTTP_HOST') && !in_array(explode(':', request()->server('HTTP_HOST'))[0], ['127.0.0.1', 'localhost']))
+        ) {
+            URL::forceScheme('https');
+        }
+`;
 
           if (/public\s+function\s+boot\s*\([^)]*\)\s*:\s*void\s*\{/i.test(providerContent)) {
             providerContent = providerContent.replace(/(public\s+function\s+boot\s*\([^)]*\)\s*:\s*void\s*\{)/i, `$1${snippet}`);

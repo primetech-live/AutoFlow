@@ -248,7 +248,17 @@ export async function initProjectCore(projectPath: string, options: InitOptions)
             try {
                 let providerContent = fs.readFileSync(appProviderPath, 'utf-8');
                 if (!providerContent.includes('forceScheme')) {
-                    const snippet = `\n        if (request()->header('x-forwarded-proto') === 'https' || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')) {\n            \\Illuminate\\Support\\Facades\\URL::forceScheme('https');\n        }\n`;
+                    const snippet = `
+        if (
+            request()->header('x-forwarded-proto') === 'https' ||
+            (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') ||
+            (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ||
+            str_starts_with(config('app.url'), 'https://') ||
+            (request()->server('HTTP_HOST') && !in_array(explode(':', request()->server('HTTP_HOST'))[0], ['127.0.0.1', 'localhost']))
+        ) {
+            \\Illuminate\\Support\\Facades\\URL::forceScheme('https');
+        }
+`;
                     if (/public\s+function\s+boot\s*\([^)]*\)\s*:\s*void\s*\{/i.test(providerContent)) {
                         providerContent = providerContent.replace(/(public\s+function\s+boot\s*\([^)]*\)\s*:\s*void\s*\{)/i, `$1${snippet}`);
                     } else if (/public\s+function\s+boot\s*\([^)]*\)\s*\{/i.test(providerContent)) {
