@@ -436,6 +436,50 @@ async function runPhpChecks(projectDir: string): Promise<void> {
     log.success('✔ All PHP CI checks passed! Proceeding to deployment...\n');
 }
 
+// ── Laravel checks ────────────────────────────────────────────────────────────
+async function runLaravelChecks(projectDir: string): Promise<void> {
+    log.info('Laravel project detected. Running Laravel CI checks...\n');
+    const cwd = projectDir;
+
+    let hasLaravelFramework = false;
+    const pkgPath = `${cwd}/composer.json`;
+    if (fs.existsSync(pkgPath)) {
+        try {
+            const comp = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+            if (comp?.require?.['laravel/framework'] || comp?.['require-dev']?.['laravel/framework']) {
+                hasLaravelFramework = true;
+            }
+        } catch {}
+    }
+
+    let dockerfilePublicRoot = false;
+    const dockerfilePath = `${cwd}/Dockerfile`;
+    if (fs.existsSync(dockerfilePath)) {
+        const dockerContent = fs.readFileSync(dockerfilePath, 'utf-8');
+        if (dockerContent.includes('/var/www/html/public')) {
+            dockerfilePublicRoot = true;
+        }
+    }
+
+    const checks: { label: string; pass: boolean; tip?: string }[] = [
+        { label: 'artisan exists', pass: fs.existsSync(`${cwd}/artisan`), tip: 'Laravel projects require an "artisan" file in the root.' },
+        { label: 'composer.json exists & valid', pass: fs.existsSync(pkgPath), tip: 'A valid composer.json is required.' },
+        { label: 'laravel/framework detected', pass: hasLaravelFramework, tip: 'composer.json must include laravel/framework dependency.' },
+        { label: 'Dockerfile exists', pass: fs.existsSync(dockerfilePath), tip: 'Run "autoflow init" to generate a Dockerfile.' },
+        { label: 'Dockerfile uses /public DocumentRoot', pass: dockerfilePublicRoot, tip: 'Apache DocumentRoot in Dockerfile must point to /var/www/html/public.' },
+        { label: 'docker-entrypoint.sh exists', pass: fs.existsSync(`${cwd}/docker-entrypoint.sh`), tip: 'Run "autoflow init" to generate docker-entrypoint.sh.' },
+    ];
+
+    let failed = false;
+    for (const check of checks) {
+        if (check.pass) { log.success(`  ✔ ${check.label}`); }
+        else { log.error(`  ✘ ${check.label}`); if (check.tip) log.info(`    Tip: ${check.tip}`); failed = true; }
+    }
+
+    if (failed) throw new AutoFlowError('Laravel CI checks failed.', EXIT_CODES.CI_FAILED, 'CI');
+    log.success('✔ All Laravel CI checks passed! Proceeding to deployment...\n');
+}
+
 // ── Python / Django / Flask checks ───────────────────────────────────────────
 function runPythonChecks(projectDir: string): void {
     log.info('Python project detected. Running Python CI checks...\n');
@@ -555,6 +599,10 @@ export async function runCIChecks(projectDir: string, appType: string, strictCI?
     switch (appType) {
         case 'static':
             runStaticChecks(projectDir);
+            return;
+
+        case 'laravel':
+            await runLaravelChecks(projectDir);
             return;
 
         case 'php':

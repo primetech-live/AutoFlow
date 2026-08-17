@@ -310,5 +310,55 @@ describe('AutoFlow Core Unit Tests', () => {
             const dockerfile = fs.readFileSync(dockerfilePath, 'utf-8');
             expect(dockerfile).toContain('FROM php:');
         });
+
+        it('should correctly detect a Laravel project and generate defensive entrypoint & public DocumentRoot Dockerfile', async () => {
+            fs.writeFileSync(path.join(testProjectPath, 'artisan'), '#!/usr/bin/env php', 'utf-8');
+            fs.writeFileSync(path.join(testProjectPath, 'composer.json'), JSON.stringify({ require: { 'laravel/framework': '^10.0' } }), 'utf-8');
+            fs.mkdirSync(path.join(testProjectPath, 'app/Providers'), { recursive: true });
+            fs.writeFileSync(path.join(testProjectPath, 'app/Providers/AppServiceProvider.php'), '<?php class AppServiceProvider { public function boot(): void {} }', 'utf-8');
+
+            const { initProjectCore } = require('../../src/core/initializer');
+            await initProjectCore(testProjectPath, {
+                projectName: 'my-laravel-app',
+                gitRepo: 'https://github.com/user/laravel-app.git',
+                domain: 'laravel.test',
+                strictCI: false,
+                useVolumes: true
+            });
+
+            const configPath = path.join(testProjectPath, 'autoflow.config.json');
+            const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+            expect(config.appType).toBe('laravel');
+
+            const dockerfilePath = path.join(testProjectPath, 'Dockerfile');
+            expect(fs.existsSync(dockerfilePath)).toBe(true);
+            const dockerfile = fs.readFileSync(dockerfilePath, 'utf-8');
+            expect(dockerfile).toContain('DocumentRoot /var/www/html/public');
+
+            const entrypointPath = path.join(testProjectPath, 'docker-entrypoint.sh');
+            expect(fs.existsSync(entrypointPath)).toBe(true);
+            const entrypoint = fs.readFileSync(entrypointPath, 'utf-8');
+            expect(entrypoint).toContain('php artisan config:clear || true');
+
+            const providerContent = fs.readFileSync(path.join(testProjectPath, 'app/Providers/AppServiceProvider.php'), 'utf-8');
+            expect(providerContent).toContain('forceScheme');
+        });
+
+        it('should fall back to plain PHP if artisan is present but laravel/framework is missing', async () => {
+            fs.writeFileSync(path.join(testProjectPath, 'artisan'), '#!/usr/bin/env php', 'utf-8');
+            fs.writeFileSync(path.join(testProjectPath, 'composer.json'), JSON.stringify({ require: { 'guzzlehttp/guzzle': '^7.0' } }), 'utf-8');
+
+            const { initProjectCore } = require('../../src/core/initializer');
+            await initProjectCore(testProjectPath, {
+                projectName: 'stale-artisan-app',
+                gitRepo: 'https://github.com/user/stale-artisan.git',
+                domain: '',
+                strictCI: false
+            });
+
+            const configPath = path.join(testProjectPath, 'autoflow.config.json');
+            const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+            expect(config.appType).toBe('php');
+        });
     });
 });

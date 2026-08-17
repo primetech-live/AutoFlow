@@ -15,7 +15,7 @@ export async function configureNginx(
 
     await setupGlobalDefaultServer(ssh);
 
-    const nginxConf = `
+    const nginxConf = `# AutoFlow-managed configuration (${projectName})
 server {
     listen 80;
     server_name ${domain};
@@ -149,8 +149,14 @@ server {
 }
 `;
 
-    // Remove default nginx config to prevent conflicts
-    await ssh.execCommand('sudo rm -f /etc/nginx/sites-enabled/default');
+    // Inspect default nginx config before removing it
+    const defaultCheck = await ssh.execCommand('cat /etc/nginx/sites-enabled/default 2>/dev/null || true');
+    const defaultContent = defaultCheck.stdout || '';
+    
+    // Only unlink default if it's unmanaged and contains no custom tools like phpMyAdmin
+    if (defaultContent && !defaultContent.includes('phpmyadmin') && !defaultContent.includes('location /phpmyadmin')) {
+        await ssh.execCommand('sudo rm -f /etc/nginx/sites-enabled/default');
+    }
 
     // Attempt modern config
     await ssh.execCommand(`cat <<'NGINX_EOF' | sudo tee ${catchAllPath} > /dev/null\n${modernConf}\nNGINX_EOF`);

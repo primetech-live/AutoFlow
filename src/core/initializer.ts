@@ -38,8 +38,45 @@ export async function initProjectCore(projectPath: string, options: InitOptions)
 
     const p = (filename: string) => path.join(projectPath, filename);
 
+    // ── Laravel Framework (Confirmed Multi-Signal) ───────────────────────
+    let isLaravelCandidate = false;
+    let isConfirmedLaravel = false;
+
+    const hasArtisan = fs.existsSync(p('artisan'));
+    let composerJson: any = null;
+    if (fs.existsSync(p('composer.json'))) {
+        try {
+            composerJson = JSON.parse(fs.readFileSync(p('composer.json'), 'utf-8'));
+        } catch {
+            /* ignore invalid json */
+        }
+    }
+
+    const hasLaravelReq = Boolean(
+        composerJson?.require?.['laravel/framework'] || composerJson?.['require-dev']?.['laravel/framework']
+    );
+
+    if (hasLaravelReq && (hasArtisan || fs.existsSync(p('bootstrap/app.php')))) {
+        isConfirmedLaravel = true;
+    } else if (hasArtisan) {
+        isLaravelCandidate = true;
+        if (fs.existsSync(p('bootstrap/app.php')) && fs.existsSync(p('config/app.php'))) {
+            isConfirmedLaravel = true;
+        } else {
+            log.warning('⚠️  "artisan" file detected but laravel/framework missing in composer.json.');
+            log.warning('    Falling back to generic PHP deployment handling.');
+        }
+    }
+
+    if (isConfirmedLaravel) {
+        appType = 'laravel';
+    }
+    // ── PHP (plain or unconfirmed artisan) ──────────────────────────────
+    else if (isLaravelCandidate || fs.existsSync(p('index.php')) || fs.existsSync(p('public/index.php')) || fs.existsSync(p('composer.json'))) {
+        appType = 'php';
+    }
     // ── Go ──────────────────────────────────────────────────────────────
-    if (fs.existsSync(p('go.mod'))) {
+    else if (fs.existsSync(p('go.mod'))) {
         appType = 'go';
     }
     // ── Java / Spring ───────────────────────────────────────────────────
@@ -65,10 +102,6 @@ export async function initProjectCore(projectPath: string, options: InitOptions)
         } else {
             appType = 'python';
         }
-    }
-    // ── PHP (plain) ─────────────────────────────────────────────────────
-    else if (fs.existsSync(p('index.php')) || fs.existsSync(p('public/index.php'))) {
-        appType = 'php';
     }
     // ── Node.js / JS Frameworks ─────────────────────────────────────────
     else if (fs.existsSync(p('package.json'))) {
@@ -111,17 +144,42 @@ export async function initProjectCore(projectPath: string, options: InitOptions)
         const suggestedVolumes: string[] = [];
         const commonDataPaths = ['data', 'database', 'storage', 'uploads'];
         for (const dataPath of commonDataPaths) {
-            if (fs.existsSync(p(dataPath))) suggestedVolumes.push(`/${dataPath}`);
+            if (dataPath === 'database') {
+                // Only persist /database if SQLite or file-based DB is detected
+                let isSqlite = false;
+                try {
+                    const files = fs.readdirSync(p('database'));
+                    if (files.some(f => f.endsWith('.sqlite') || f.endsWith('.db'))) isSqlite = true;
+                } catch {}
+                if (fs.existsSync(p('.env'))) {
+                    const envContent = fs.readFileSync(p('.env'), 'utf-8');
+                    if (envContent.includes('DB_CONNECTION=sqlite')) isSqlite = true;
+                }
+                if (isSqlite && fs.existsSync(p('database'))) suggestedVolumes.push('/database');
+            } else if (fs.existsSync(p(dataPath))) {
+                suggestedVolumes.push(`/${dataPath}`);
+            }
+        }
+        if (appType === 'laravel') {
+            if (!suggestedVolumes.includes('/storage') && fs.existsSync(p('storage'))) {
+                suggestedVolumes.push('/storage');
+            }
+            if (fs.existsSync(p('public/uploads')) && !suggestedVolumes.includes('/public/uploads')) {
+                suggestedVolumes.push('/public/uploads');
+            }
+            if (fs.existsSync(p('public/assets/uploads')) && !suggestedVolumes.includes('/public/assets/uploads')) {
+                suggestedVolumes.push('/public/assets/uploads');
+            }
         }
         try {
             const files = fs.readdirSync(projectPath);
             for (const f of files) {
-                if (f.endsWith('.sqlite') || f.endsWith('.db')) {
+                if ((f.endsWith('.sqlite') || f.endsWith('.db')) && !suggestedVolumes.includes(`/${f}`)) {
                     suggestedVolumes.push(`/${f}`);
                 }
             }
         } catch { /* ignore */ }
-        volumes = suggestedVolumes;
+        volumes = Array.from(new Set(suggestedVolumes));
     }
 
     /* ── Save config ─────────────────────────────────────────────────── */
@@ -143,8 +201,71 @@ export async function initProjectCore(projectPath: string, options: InitOptions)
     let dockerfile = '';
     let dockerignoreExtras = '';
 
+    // ─── Laravel Framework ──────────────────────────────────────────────
+    if (appType === 'laravel') {
+        let requiresNode = false;
+        if (fs.existsSync(p('package.json'))) {
+            try {
+                const pkg = JSON.parse(fs.readFileSync(p('package.json'), 'utf-8'));
+                const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+                const scripts = pkg.scripts || {};
+                if (deps.vite || deps['laravel-mix'] || deps.webpack || deps.tailwindcss || scripts.build || scripts.dev) {
+                    requiresNode = true;
+                }
+            } catch {}
+        }
+
+        const nodeInstallStep = requiresNode
+            ? '    nodejs \\\n    npm \\\n'
+            : '';
+
+        dockerfile = `FROM php:8.2-apache\n\n# Install System Dependencies & PHP Extensions required by Laravel\nRUN apt-get update && apt-get install -y \\\n    git \\\n    curl \\\n    libpng-dev \\\n    libonig-dev \\\n    libxml2-dev \\\n    zip \\\n    unzip \\\n    libzip-dev \\\n${nodeInstallStep}    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip\n\n# Enable Apache mod_rewrite for clean URLs\nRUN a2enmod rewrite\n\n# Update Apache Port (3000) and DocumentRoot (/var/www/html/public)\nRUN sed -i 's/Listen 80/Listen 3000/' /etc/apache2/ports.conf && \\\n    sed -i 's/<VirtualHost \\*:80>/<VirtualHost *:3000>/' /etc/apache2/sites-enabled/000-default.conf && \\\n    sed -i 's|DocumentRoot /var/www/html|DocumentRoot /var/www/html/public|g' /etc/apache2/sites-enabled/000-default.conf && \\\n    echo "UseCanonicalName Off" >> /etc/apache2/apache2.conf && \\\n    echo "UseCanonicalPhysicalPort Off" >> /etc/apache2/apache2.conf\n\n# Install Composer\nCOPY --from=composer:latest /usr/bin/composer /usr/bin/composer\n\nWORKDIR /var/www/html\n\n# Copy all project files\nCOPY . .\n\n# Install PHP dependencies via Composer\nRUN composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev\n\n# Copy startup entrypoint script & make executable\nCOPY docker-entrypoint.sh /usr/local/bin/\nRUN chmod +x /usr/local/bin/docker-entrypoint.sh\n\n# Set initial permissions for Laravel storage, cache, and uploads directories\nRUN mkdir -p /var/www/html/public/uploads /var/www/html/public/assets/uploads /var/www/html/storage/app/public && \\\n    chown -R www-data:www-data /var/www/html && \\\n    chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache /var/www/html/public/uploads /var/www/html/public/assets 2>/dev/null || true\n\nEXPOSE 3000\n\nENTRYPOINT ["docker-entrypoint.sh"]`;
+        dockerignoreExtras = '\n# Laravel\n.env\nvendor/\nstorage/*.key\n*.log';
+
+        // ── Generate defensive docker-entrypoint.sh ──────────────────────────
+        const entrypointScript = `#!/bin/sh\n\n# Safe file/config clear (does NOT try connecting to Database during boot)\nphp artisan config:clear || true\nphp artisan view:clear || true\nphp artisan route:clear || true\n\n# Re-apply correct ownership & permissions on volumes\nmkdir -p /var/www/html/public/uploads /var/www/html/public/assets/uploads /var/www/html/storage/app/public\nchown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache /var/www/html/public/uploads /var/www/html/public/assets 2>/dev/null || true\nchmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache /var/www/html/public/uploads /var/www/html/public/assets 2>/dev/null || true\n\n# Start Apache in foreground\nexec apache2-foreground\n`;
+        fs.writeFileSync(p('docker-entrypoint.sh'), entrypointScript);
+        try { fs.chmodSync(p('docker-entrypoint.sh'), 0o755); } catch {}
+        log.success('docker-entrypoint.sh generated');
+
+        // ── 3-Tier Layered Proxy-Aware HTTPS Handling ────────────────────────
+        const appProviderPath = p('app/Providers/AppServiceProvider.php');
+        const trustProxiesPath = p('app/Http/Middleware/TrustProxies.php');
+        const bootstrapAppPath = p('bootstrap/app.php');
+
+        let alreadyHasProxyHandling = false;
+        if (fs.existsSync(appProviderPath) && fs.readFileSync(appProviderPath, 'utf-8').includes('forceScheme')) {
+            alreadyHasProxyHandling = true;
+        }
+        if (fs.existsSync(trustProxiesPath) && fs.readFileSync(trustProxiesPath, 'utf-8').includes('$proxies')) {
+            alreadyHasProxyHandling = true;
+        }
+        if (fs.existsSync(bootstrapAppPath) && fs.readFileSync(bootstrapAppPath, 'utf-8').includes('trustProxies')) {
+            alreadyHasProxyHandling = true;
+        }
+
+        if (!alreadyHasProxyHandling && fs.existsSync(appProviderPath)) {
+            try {
+                let providerContent = fs.readFileSync(appProviderPath, 'utf-8');
+                if (!providerContent.includes('forceScheme')) {
+                    const snippet = `\n        if (request()->header('x-forwarded-proto') === 'https' || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')) {\n            \\Illuminate\\Support\\Facades\\URL::forceScheme('https');\n        }\n`;
+                    if (/public\s+function\s+boot\s*\([^)]*\)\s*:\s*void\s*\{/i.test(providerContent)) {
+                        providerContent = providerContent.replace(/(public\s+function\s+boot\s*\([^)]*\)\s*:\s*void\s*\{)/i, `$1${snippet}`);
+                    } else if (/public\s+function\s+boot\s*\([^)]*\)\s*\{/i.test(providerContent)) {
+                        providerContent = providerContent.replace(/(public\s+function\s+boot\s*\([^)]*\)\s*\{)/i, `$1${snippet}`);
+                    } else {
+                        providerContent = providerContent.replace(/class\s+AppServiceProvider\s+extends\s+\w+\s*\{/i, `$&\n    public function boot(): void\n    {${snippet}    }\n`);
+                    }
+                    fs.writeFileSync(appProviderPath, providerContent);
+                    log.success('AppServiceProvider.php updated with HTTPS reverse-proxy handling');
+                }
+            } catch (err) {
+                log.warning(`Could not modify AppServiceProvider.php safely: ${err instanceof Error ? err.message : String(err)}`);
+            }
+        }
+    }
     // ─── PHP (plain) ────────────────────────────────────────────────────
-    if (appType === 'php') {
+    else if (appType === 'php') {
         dockerfile = `FROM php:8.2-apache\n\nRUN a2enmod rewrite\nRUN docker-php-ext-install mysqli pdo pdo_mysql\nRUN sed -i 's/Listen 80/Listen 3000/' /etc/apache2/ports.conf && \\\n    sed -i 's/<VirtualHost \\*:80>/<VirtualHost *:3000>/' /etc/apache2/sites-enabled/000-default.conf && \\\n    echo "UseCanonicalName Off" >> /etc/apache2/apache2.conf && \\\n    echo "UseCanonicalPhysicalPort Off" >> /etc/apache2/apache2.conf\n\nWORKDIR /var/www/html\nCOPY . .\nRUN chown -R www-data:www-data /var/www/html\nEXPOSE 3000\nCMD ["apache2-foreground"]`;
         dockerignoreExtras = '\n# PHP\n.env\nvendor/\n*.log';
     }

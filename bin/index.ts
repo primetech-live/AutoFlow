@@ -30,7 +30,7 @@ bannerLines.forEach((line, i) => {
 
 const printStaticMascot = () => {
     console.log(chalk.yellow(`   (\\_/)`));
-    console.log(chalk.yellow(`   ( •_•)  `) + chalk.gray(`AutoFlow Core v1.0.1`));
+    console.log(chalk.yellow(`   ( •_•)  `) + chalk.gray(`AutoFlow Core v1.0.0`));
     console.log(chalk.yellow(`   / >🚀   `) + chalk.magenta(`Ready to deploy your apps!`));
     console.log('');
 };
@@ -38,7 +38,7 @@ const printStaticMascot = () => {
 program
     .name('autoflow')
     .description('Automated CI/CD CLI tool for students and beginners')
-    .version('1.0.1');
+    .version('1.0.0');
 
 program
     .command('setup')
@@ -82,7 +82,7 @@ if (isBareCommand) {
         }
         process.stdout.write('\x1B[4A'); // Move cursor up 4 lines
         console.log(chalk.yellow(`   (\\_/)`));
-        console.log(chalk.yellow(`   ${frames[frame]}  `) + chalk.gray(`AutoFlow Core v1.0.1`));
+        console.log(chalk.yellow(`   ${frames[frame]}  `) + chalk.gray(`AutoFlow Core v1.0.0`));
         console.log(chalk.yellow(`   / >🚀   `) + chalk.magenta(`Ready to deploy your apps!`));
         console.log('');
     }, 400);

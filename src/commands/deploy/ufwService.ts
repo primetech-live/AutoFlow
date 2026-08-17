@@ -26,10 +26,13 @@ export async function configureUFW(ssh: NodeSSH, port: string | number, isDomain
         await exec(ssh, 'sudo ufw allow 80/tcp');
         await exec(ssh, 'sudo ufw allow 443/tcp');
         await exec(ssh, `sudo ufw deny ${escapeShellArg(String(port))}/tcp`); // Secure the backend
-        log.success('✔ UFW configured for Nginx (80/443 open, backend secured).');
+        // Safely allow Docker bridge interface (docker0) to access host database port (3306)
+        await ssh.execCommand('sudo ufw allow in on docker0 to any port 3306 2>/dev/null || true');
+        log.success('✔ UFW configured for Nginx (80/443 open, backend secured, docker0 DB bridge open).');
     } else {
         // Direct IP mode: allow the specific allocated port
         await exec(ssh, `sudo ufw allow ${escapeShellArg(String(port))}/tcp`);
+        await ssh.execCommand('sudo ufw allow in on docker0 to any port 3306 2>/dev/null || true');
         log.success(`✔ UFW configured for direct access (Port ${port} open).`);
     }
 }
