@@ -15,8 +15,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lint-and-test:
-    name: Quality Gate
+  # ── GATE 1: Code Integrity & Unit Tests ─────────────────────────────────────
+  quality-gate-1-unit-tests:
+    name: "Gate 1: Unit & Integration Tests"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -30,12 +31,33 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Run tests
+      - name: Run unit & integration tests
         run: npm test
 
-  build:
-    name: Build (${{ matrix.os }})
-    needs: lint-and-test
+  # ── GATE 2: Production Bundle Compilation Check ──────────────────────────────
+  quality-gate-2-build-verify:
+    name: "Gate 2: Production Bundle Compilation"
+    needs: quality-gate-1-unit-tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Compile production bundle
+        run: npm run build
+
+  # ── BUILD & DIRECT PUBLISH TO RELEASE REPO ─────────────────────────────────
+  build-and-publish:
+    name: Build & Direct Publish (${{ matrix.os }})
+    needs: quality-gate-2-build-verify
     strategy:
       fail-fast: false
       matrix:
@@ -60,7 +82,7 @@ jobs:
 
       - name: Install Linux build dependencies
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libarchive-tools libopenjp2-7
+        run: sudo apt-get update && sudo apt-get install -y libarchive-tools libopenjp2-7 git-lfs
 
       - name: Install dependencies
         run: npm install
@@ -75,10 +97,10 @@ jobs:
           npm version "$VERSION" --no-git-tag-version --allow-same-version
           npm install
 
-      - name: Build
+      - name: Build Production Assets
         run: npm run build
 
-      - name: Package
+      - name: Package Binaries
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
@@ -86,83 +108,39 @@ jobs:
           mkdir -p release
           npm run dist -- ${{ matrix.target_flag }} -p always
 
-      - name: Upload Build Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: autoflow-package-${{ matrix.os }}
-          path: |
-            release/*.exe
-            release/*.dmg
-            release/*.AppImage
-            release/*.deb
-          if-no-files-found: ignore
-
-  publish-binaries:
-    name: Publish Binaries
-    needs: build
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Download build artefacts
-        uses: actions/download-artifact@v4
-        with:
-          path: collected-artifacts
-          merge-multiple: true
-
-      - name: Set up Git LFS
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y git-lfs
-          git lfs install
-
-      - name: Clone public releases repo
+      - name: Direct Publish Executables to Autoflow-Release Repo
+        shell: bash
         env:
           GIT_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           git config --global user.email "ci@autoflow.tech"
           git config --global user.name "AutoFlow CI"
           git clone https://x-access-token:${GIT_TOKEN}@github.com/primetech-live/Autoflow-Release.git public-repo
-
-      - name: Clean old release assets
-        run: |
-          rm -rf public-repo/release/*
           mkdir -p public-repo/release
+          
+          # Copy OS binaries directly
+          cp release/*.exe public-repo/release/ 2>/dev/null || true
+          cp release/*.dmg public-repo/release/ 2>/dev/null || true
+          cp release/*.AppImage public-repo/release/ 2>/dev/null || true
+          cp release/*.deb public-repo/release/ 2>/dev/null || true
 
-      - name: Copy binaries to public repo
-        run: |
-          find collected-artifacts -type f -exec cp {} public-repo/release/ \;
-
-      - name: Track binaries with Git LFS
-        run: |
           cd public-repo
-          git lfs track "release/*"
-          git add .gitattributes
-
-      - name: Commit & push binaries
-        shell: bash
-        run: |
-          cd public-repo
-          git add -A
-          if git diff --cached --quiet; then
-            echo "No changes to commit"
-            exit 0
+          git lfs install 2>/dev/null || true
+          git lfs track "release/*" 2>/dev/null || true
+          git add .gitattributes release/ 2>/dev/null || true
+          
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: publish ${{ matrix.os }} binaries for ${{ github.ref_name }}"
+            git push origin main
           fi
-          git commit -m "chore: publish binaries for ${{ github.ref_name }}"
-          git push origin main
 
-      - name: Create GitHub release
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-        run: |
           gh release create "${{ github.ref_name }}" \
             --repo primetech-live/Autoflow-Release \
             --title "AutoFlow ${{ github.ref_name }}" \
             --notes "AutoFlow release ${{ github.ref_name }}" \
-            --target main || echo "Release already exists"
+            --target main || true
 
-      - name: Upload release assets
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-        run: |
-          gh release upload "${{ github.ref_name }}" public-repo/release/* \
-            --repo primetech-live/Autoflow-Release --clobber
+          gh release upload "${{ github.ref_name }}" release/* \
+            --repo primetech-live/Autoflow-Release --clobber 2>/dev/null || true
+
