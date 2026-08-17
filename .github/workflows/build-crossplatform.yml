@@ -141,6 +141,6 @@ jobs:
             --notes "AutoFlow release ${{ github.ref_name }}" \
             --target main || true
 
-          gh release upload "${{ github.ref_name }}" release/* \
+          gh release upload "${{ github.ref_name }}" public-repo/release/* \
             --repo primetech-live/Autoflow-Release --clobber 2>/dev/null || true
 
