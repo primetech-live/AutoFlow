@@ -8,6 +8,7 @@
   },
   "scripts": {
     "build:cli": "vite build -c vite.cli.config.ts",
+    "build:binary": "npm run build:cli && npx @yao-pkg/pkg dist/cli.js --target node18-win-x64,node18-linux-x64,node18-macos-x64 --out-path dist/bin",
     "build": "npm run build:cli && npm run build:ui && tsc && node scripts/copy-assets.js",
     "build:ui": "vite build",
     "start": "electron .",
@@ -129,6 +130,7 @@
     "@types/speakeasy": "^2.0.10",
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^4.3.1",
+    "@yao-pkg/pkg": "^6.22.0",
     "electron": "^28.2.0",
     "electron-builder": "^24.9.1",
     "jest": "^30.4.2",
