@@ -365,6 +365,7 @@ exec "$@"
     if (fs.existsSync(appProviderPath)) {
       try {
         let providerContent = fs.readFileSync(appProviderPath, 'utf-8');
+        const hasForceScheme = providerContent.includes('forceScheme') || providerContent.includes('URL::forceScheme');
         if (!hasForceScheme) {
           if (!providerContent.includes('use Illuminate\\Support\\Facades\\URL;')) {
             providerContent = providerContent.replace(/(namespace\s+App\\Providers;)/, `$1\n\nuse Illuminate\\Support\\Facades\\URL;`);
