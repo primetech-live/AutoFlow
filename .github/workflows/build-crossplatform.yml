@@ -132,6 +132,7 @@ jobs:
           
           if ! git diff --cached --quiet; then
             git commit -m "chore: publish ${{ matrix.os }} binaries for ${{ github.ref_name }}"
+            git pull --rebase origin main || true
             git push origin main
           fi
 
@@ -141,6 +142,6 @@ jobs:
             --notes "AutoFlow release ${{ github.ref_name }}" \
             --target main || true
 
-          gh release upload "${{ github.ref_name }}" public-repo/release/* \
+          gh release upload "${{ github.ref_name }}" release/* \
             --repo primetech-live/Autoflow-Release --clobber 2>/dev/null || true
 
