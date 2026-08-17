@@ -1,0 +1,14 @@
+#!/bin/sh
+set -e
+
+# AutoFlow Linux (.deb) Post-Remove Uninstaller Script
+# Executed automatically when package is uninstalled via 'dpkg -r' or 'apt remove'
+
+CLI_LINK="/usr/local/bin/autoflow"
+
+if [ -L "$CLI_LINK" ] || [ -f "$CLI_LINK" ]; then
+    echo "Removing AutoFlow CLI symlink from $CLI_LINK..."
+    rm -f "$CLI_LINK" || true
+fi
+
+echo "AutoFlow CLI cleanly uninstalled."

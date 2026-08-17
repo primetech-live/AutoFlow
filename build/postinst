@@ -1,0 +1,17 @@
+#!/bin/sh
+set -e
+
+# AutoFlow Linux (.deb) Post-Install Script
+# Creates system-wide CLI symlink into /usr/local/bin
+
+INSTALL_DIR="/opt/Autoflow-vNext"
+CLI_EXEC="$INSTALL_DIR/resources/app/dist/bin/index.js"
+TARGET_LINK="/usr/local/bin/autoflow"
+
+if [ -f "$CLI_EXEC" ]; then
+    chmod +x "$CLI_EXEC" 2>/dev/null || true
+    echo "#!/bin/sh" > "$TARGET_LINK"
+    echo "exec node \"$CLI_EXEC\" \"\$@\"" >> "$TARGET_LINK"
+    chmod +x "$TARGET_LINK" 2>/dev/null || true
+    echo "AutoFlow CLI symlinked to $TARGET_LINK"
+fi
