@@ -67,13 +67,11 @@
         "AppImage",
         "deb"
       ],
-      "category": "Utility",
-      "deb": {
-        "scripts": {
-          "postinst": "build/postinst",
-          "postrm": "build/postrm"
-        }
-      }
+      "category": "Utility"
+    },
+    "deb": {
+      "afterInstall": "build/postinst",
+      "afterRemove": "build/postrm"
     }
   },
   "engines": {
