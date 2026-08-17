@@ -132,8 +132,9 @@ jobs:
           
           if ! git diff --cached --quiet; then
             git commit -m "chore: publish ${{ matrix.os }} binaries for ${{ github.ref_name }}"
-            git pull --rebase origin main || true
-            git push origin main
+            for i in {1..5}; do
+              git fetch origin main && git rebase origin/main && git push origin main && break || sleep 5
+            done
           fi
 
           gh release create "${{ github.ref_name }}" \
