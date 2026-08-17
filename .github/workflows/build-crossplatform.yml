@@ -97,10 +97,19 @@ jobs:
           npm version "$VERSION" --no-git-tag-version --allow-same-version
           npm install
 
-      - name: Build Production Assets & Standalone CLI
+      - name: Build Production Assets
+        run: npm run build
+
+      - name: Build Standalone CLI Binary
+        shell: bash
         run: |
-          npm run build
-          npm run build:binary
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            npx @yao-pkg/pkg dist/cli.js --target node18-win-x64 --out-path dist/bin
+          elif [ "${{ runner.os }}" = "Linux" ]; then
+            npx @yao-pkg/pkg dist/cli.js --target node18-linux-x64 --out-path dist/bin
+          elif [ "${{ runner.os }}" = "macOS" ]; then
+            npx @yao-pkg/pkg dist/cli.js --target node18-macos-x64 --out-path dist/bin
+          fi
 
       - name: Package Binaries
         shell: bash
