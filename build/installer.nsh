@@ -7,14 +7,7 @@
   Delete "$INSTDIR\autoflow.exe"
   Delete "$INSTDIR\autoflow"
 
-  # Remove App installation directory from User & System PATH
-  EnVar::SetHKCU
-  EnVar::DeleteValue "PATH" "$INSTDIR"
-  
-  EnVar::SetHKLM
-  EnVar::DeleteValue "PATH" "$INSTDIR"
-
-  # Also remove npm global bin directory if registered by installer
+  # Safely remove installation directory from User PATH using PowerShell
   nsExec::ExecToLog 'powershell -NoProfile -ExecutionPolicy Bypass -Command "[System.Environment]::SetEnvironmentVariable(\"PATH\", (([System.Environment]::GetEnvironmentVariable(\"PATH\", \"User\").Split(\";\") | Where-Object { $_ -ne \"$INSTDIR\" }) -join \";\"), \"User\")"'
 
   DetailPrint "AutoFlow CLI successfully uninstalled."
