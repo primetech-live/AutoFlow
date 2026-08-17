@@ -130,10 +130,36 @@ async function init(): Promise<void> {
       log.info('✨ Detected: Python');
     }
   }
+  // ── Laravel Framework (Confirmed Multi-Signal) ───────────────────────
+  let isConfirmedLaravel = false;
+  const hasArtisan = fs.existsSync('artisan');
+  let composerJson: any = null;
+  if (fs.existsSync('composer.json')) {
+    try {
+      composerJson = JSON.parse(fs.readFileSync('composer.json', 'utf-8'));
+    } catch { /* ignore */ }
+  }
+  const hasLaravelReq = Boolean(
+    composerJson?.require?.['laravel/framework'] || composerJson?.['require-dev']?.['laravel/framework']
+  );
+
+  if (hasLaravelReq && (hasArtisan || fs.existsSync('bootstrap/app.php'))) {
+    isConfirmedLaravel = true;
+  } else if (hasArtisan) {
+    if (fs.existsSync('bootstrap/app.php') && fs.existsSync('config/app.php')) {
+      isConfirmedLaravel = true;
+    } else {
+      log.warning('⚠️  "artisan" file detected but laravel/framework missing in composer.json.');
+      log.warning('    Falling back to generic PHP deployment handling.');
+    }
+  }
+
+  if (isConfirmedLaravel) {
+    appType = 'laravel';
+    log.info('✨ Detected: Laravel');
+  }
   // ── PHP (plain) ─────────────────────────────────────────────────────
-  // Note: Laravel (artisan) is intentionally excluded — DB migration complexity
-  // is managed separately by the user via phpMyAdmin.
-  else if (fs.existsSync('index.php') || fs.existsSync('public/index.php')) {
+  else if (hasArtisan || fs.existsSync('index.php') || fs.existsSync('public/index.php') || fs.existsSync('composer.json')) {
     appType = 'php';
     log.info('✨ Detected: PHP');
     log.info('  ℹ️  DB Note: AutoFlow deploys CODE only. Please set up your MySQL database');
@@ -239,8 +265,121 @@ async function init(): Promise<void> {
   let dockerfile = '';
   let dockerignoreExtras = '';
 
+  // ─── Laravel ────────────────────────────────────────────────────────
+  if (appType === 'laravel') {
+    let requiresNode = false;
+    let pkgJson: any = null;
+    if (fs.existsSync('package.json')) {
+      try {
+        pkgJson = JSON.parse(fs.readFileSync('package.json', 'utf-8'));
+        const deps = { ...pkgJson?.dependencies, ...pkgJson?.devDependencies };
+        const scripts = pkgJson?.scripts || {};
+        if (deps.vite || deps['laravel-mix'] || deps.webpack || deps.tailwindcss || scripts.build || scripts.dev) {
+          requiresNode = true;
+        }
+      } catch { /* ignore */ }
+    }
+
+    const nodeInstallBlock = requiresNode
+      ? `\n# Install Node.js & npm for frontend asset building\nRUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \\\n    apt-get install -y nodejs\n`
+      : '';
+
+    const nodeBuildStep = requiresNode
+      ? `\n# Build frontend assets if package.json scripts exist\nRUN if [ -f package.json ]; then npm install && (npm run build || npm run dev || true); fi\n`
+      : '';
+
+    dockerfile = `FROM php:8.2-apache
+
+# Install system dependencies & PHP extensions required by Laravel
+RUN apt-get update && apt-get install -y \\
+    git curl libpng-dev libonig-dev libxml2-dev zip unzip libzip-dev \\
+    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip
+
+# Enable Apache mod_rewrite
+RUN a2enmod rewrite
+${nodeInstallBlock}
+# Install Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+WORKDIR /var/www/html
+
+COPY . .
+
+# Install PHP dependencies
+RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
+${nodeBuildStep}
+# Configure Apache DocumentRoot to /var/www/html/public & set port 3000
+RUN sed -i 's|DocumentRoot /var/www/html|DocumentRoot /var/www/html/public|g' /etc/apache2/sites-available/000-default.conf && \\
+    sed -i 's/<VirtualHost \\*:80>/<VirtualHost *:3000>/' /etc/apache2/sites-available/000-default.conf && \\
+    sed -i 's/Listen 80/Listen 3000/' /etc/apache2/ports.conf && \\
+    echo "UseCanonicalName Off" >> /etc/apache2/apache2.conf && \\
+    echo "UseCanonicalPhysicalPort Off" >> /etc/apache2/apache2.conf
+
+# Set permissions for Laravel storage & bootstrap/cache
+RUN chown -R www-data:www-data /var/www/html \\
+    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+
+# Copy entrypoint script
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+EXPOSE 3000
+ENTRYPOINT ["docker-entrypoint.sh"]
+CMD ["apache2-foreground"]`;
+
+    dockerignoreExtras = '\n# Laravel\n.env\nvendor/\nnode_modules/\n*.log\nstorage/*.key';
+
+    // Generate docker-entrypoint.sh safely
+    const entrypointContent = `#!/bin/sh
+set -e
+
+# Run migrations if DB is configured, fail silently if DB unreachable
+if [ -n "$DB_HOST" ] || [ -n "$DB_CONNECTION" ]; then
+    echo "Running database migrations..."
+    php artisan migrate --force || echo "Migration skipped or failed (non-critical)"
+fi
+
+# Clear & optimize caches non-blockingly
+php artisan config:cache || true
+php artisan route:cache || true
+php artisan view:cache || true
+
+exec "$@"
+`;
+    fs.writeFileSync('docker-entrypoint.sh', entrypointContent, { mode: 0o755 });
+    log.success('docker-entrypoint.sh generated');
+
+    // HTTPS Reverse-Proxy Injection in AppServiceProvider.php
+    const appProviderPath = path.join('app', 'Providers', 'AppServiceProvider.php');
+    if (fs.existsSync(appProviderPath)) {
+      try {
+        let providerContent = fs.readFileSync(appProviderPath, 'utf-8');
+        const hasForceScheme = providerContent.includes('forceScheme') || providerContent.includes('URL::forceScheme');
+        const hasTrustProxies = providerContent.includes('TrustProxies') || fs.existsSync(path.join('app', 'Http', 'Middleware', 'TrustProxies.php'));
+
+        if (!hasForceScheme && !hasTrustProxies) {
+          if (!providerContent.includes('use Illuminate\\Support\\Facades\\URL;')) {
+            providerContent = providerContent.replace(/(namespace\s+App\\Providers;)/, `$1\n\nuse Illuminate\\Support\\Facades\\URL;`);
+          }
+          const snippet = `\n        if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {\n            URL::forceScheme('https');\n        }\n`;
+
+          if (/public\s+function\s+boot\s*\([^)]*\)\s*:\s*void\s*\{/i.test(providerContent)) {
+            providerContent = providerContent.replace(/(public\s+function\s+boot\s*\([^)]*\)\s*:\s*void\s*\{)/i, `$1${snippet}`);
+          } else if (/public\s+function\s+boot\s*\([^)]*\)\s*\{/i.test(providerContent)) {
+            providerContent = providerContent.replace(/(public\s+function\s+boot\s*\([^)]*\)\s*\{)/i, `$1${snippet}`);
+          } else {
+            providerContent = providerContent.replace(/class\s+AppServiceProvider\s+extends\s+\w+\s*\{/i, `$&\n    public function boot(): void\n    {${snippet}    }\n`);
+          }
+          fs.writeFileSync(appProviderPath, providerContent);
+          log.success('AppServiceProvider.php updated with HTTPS reverse-proxy handling');
+        }
+      } catch (err) {
+        log.warning(`Could not modify AppServiceProvider.php safely: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+  }
   // ─── PHP (plain) ────────────────────────────────────────────────────
-  if (appType === 'php') {
+  else if (appType === 'php') {
     dockerfile = `FROM php:8.2-apache
 
 # Enable Apache mod_rewrite for clean URLs
