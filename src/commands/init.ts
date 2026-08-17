@@ -218,32 +218,43 @@ async function init(): Promise<void> {
   }
 
   /* ── Volume Detection (Persistence) ────────────────────────────── */
-  const suggestedVolumes: string[] = [];
-  const commonDataPaths = ['data', 'database', 'storage', 'uploads'];
-  for (const p of commonDataPaths) {
-    if (fs.existsSync(p)) suggestedVolumes.push(`/${p}`);
-  }
-  // Check for sqlite files in root
-  try {
-    const files = fs.readdirSync(process.cwd());
-    for (const f of files) {
-      if (f.endsWith('.sqlite') || f.endsWith('.db')) {
-        suggestedVolumes.push(`/${f}`);
-      }
-    }
-  } catch { /* ignore */ }
-
   let volumes: string[] = [];
-  if (suggestedVolumes.length > 0) {
-    log.info(`\n💾 Persistence: AutoFlow detected possible data paths: ${suggestedVolumes.join(', ')}`);
-    const { useVolumes } = await inquirer.prompt<{ useVolumes: boolean }>({
-      type: 'confirm',
-      name: 'useVolumes',
-      message: 'Enable persistent volumes for these paths? (Recommended for databases)',
-      default: true,
-    });
-    if (useVolumes) {
-      volumes = suggestedVolumes;
+  if (appType === 'laravel' || isConfirmedLaravel) {
+    volumes = [
+      '/database',
+      '/storage',
+      '/public',
+      '/public/uploads',
+      '/public/assets/uploads'
+    ];
+    log.info(`💾 Persistence: Auto-configured full Laravel volumes: ${volumes.join(', ')}`);
+  } else {
+    const suggestedVolumes: string[] = [];
+    const commonDataPaths = ['data', 'database', 'storage', 'uploads'];
+    for (const p of commonDataPaths) {
+      if (fs.existsSync(p)) suggestedVolumes.push(`/${p}`);
+    }
+    // Check for sqlite files in root
+    try {
+      const files = fs.readdirSync(process.cwd());
+      for (const f of files) {
+        if (f.endsWith('.sqlite') || f.endsWith('.db')) {
+          suggestedVolumes.push(`/${f}`);
+        }
+      }
+    } catch { /* ignore */ }
+
+    if (suggestedVolumes.length > 0) {
+      log.info(`\n💾 Persistence: AutoFlow detected possible data paths: ${suggestedVolumes.join(', ')}`);
+      const { useVolumes } = await inquirer.prompt<{ useVolumes: boolean }>({
+        type: 'confirm',
+        name: 'useVolumes',
+        message: 'Enable persistent volumes for these paths? (Recommended for databases)',
+        default: true,
+      });
+      if (useVolumes) {
+        volumes = suggestedVolumes;
+      }
     }
   }
 
@@ -354,10 +365,7 @@ exec "$@"
     if (fs.existsSync(appProviderPath)) {
       try {
         let providerContent = fs.readFileSync(appProviderPath, 'utf-8');
-        const hasForceScheme = providerContent.includes('forceScheme') || providerContent.includes('URL::forceScheme');
-        const hasTrustProxies = providerContent.includes('TrustProxies') || fs.existsSync(path.join('app', 'Http', 'Middleware', 'TrustProxies.php'));
-
-        if (!hasForceScheme && !hasTrustProxies) {
+        if (!hasForceScheme) {
           if (!providerContent.includes('use Illuminate\\Support\\Facades\\URL;')) {
             providerContent = providerContent.replace(/(namespace\s+App\\Providers;)/, `$1\n\nuse Illuminate\\Support\\Facades\\URL;`);
           }
@@ -627,8 +635,50 @@ on:
 jobs:
 `;
 
+    // ── Laravel CI ──────────────────────────────────────────────────
+    if (appType === 'laravel' || isConfirmedLaravel) {
+      ciWorkflow = `${ciHeader}  ci:
+    name: Laravel Application CI
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, dom, fileinfo, mysql, pdo, pdo_mysql, bcmath, ctype, json, openssl, tokenizer, xml
+          coverage: none
+
+      - name: Install Composer Dependencies
+        run: composer install --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist --optimize-autoloader
+
+      - name: Prepare Environment
+        run: |
+          cp .env.example .env 2>/dev/null || true
+          php artisan key:generate || true
+
+      - name: Check Dockerfile & Configuration
+        run: |
+          [ -f "Dockerfile" ] || { echo "❌ Dockerfile missing"; exit 1; }
+          [ -f "autoflow.config.json" ] || { echo "❌ autoflow.config.json missing"; exit 1; }
+          echo "✅ Laravel deployment assets verified"
+
+      - name: Run Tests
+        run: |
+          if [ -f "vendor/bin/phpunit" ]; then
+            vendor/bin/phpunit --no-coverage
+          elif [ -f "vendor/bin/pest" ]; then
+            vendor/bin/pest
+          else
+            echo "ℹ️ No test suite found, skipping test execution"
+          fi
+`;
+    }
     // ── PHP CI ──────────────────────────────────────────────────────
-    if (appType === 'php') {
+    else if (appType === 'php') {
       const composerStep = fs.existsSync('composer.json')
         ? `
       - name: Install Composer dependencies

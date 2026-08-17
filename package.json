@@ -39,7 +39,8 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": "build/icon-1.png"
+      "icon": "build/icon-1.png",
+      "artifactName": "Autoflow-vNext_v${version}.${ext}"
     },
     "nsis": {
       "oneClick": false,
@@ -49,7 +50,8 @@
       "license": "build/license.txt",
       "uninstallDisplayName": "Autoflow-vNext",
       "installerSidebar": "build/installer-sidebar.bmp",
-      "uninstallerSidebar": "build/installer-sidebar.bmp"
+      "uninstallerSidebar": "build/installer-sidebar.bmp",
+      "artifactName": "Autoflow-vNext_v${version}.${ext}"
     },
     "mac": {
       "target": [
