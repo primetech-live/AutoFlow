@@ -97,8 +97,10 @@ jobs:
           npm version "$VERSION" --no-git-tag-version --allow-same-version
           npm install
 
-      - name: Build Production Assets
-        run: npm run build
+      - name: Build Production Assets & Standalone CLI
+        run: |
+          npm run build
+          npm run build:binary
 
       - name: Package Binaries
         shell: bash
