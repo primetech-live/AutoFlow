@@ -8,7 +8,7 @@
   Delete "$INSTDIR\autoflow"
 
   # Safely remove installation directory from User PATH using PowerShell
-  nsExec::ExecToLog 'powershell -NoProfile -ExecutionPolicy Bypass -Command "[System.Environment]::SetEnvironmentVariable(\"PATH\", (([System.Environment]::GetEnvironmentVariable(\"PATH\", \"User\").Split(\";\") | Where-Object { $_ -ne \"$INSTDIR\" }) -join \";\"), \"User\")"'
+  nsExec::ExecToLog 'powershell -NoProfile -ExecutionPolicy Bypass -Command "$$p = [System.Environment]::GetEnvironmentVariable(\"PATH\", \"User\"); if ($$p) { $$p = ($$p.Split(\";\") | Where-Object { $$_ -ne \"$INSTDIR\" }) -join \";\"; [System.Environment]::SetEnvironmentVariable(\"PATH\", $$p, \"User\") }"'
 
   DetailPrint "AutoFlow CLI successfully uninstalled."
 !macroend
