@@ -614,8 +614,6 @@ CMD ${JSON.stringify(startCommand.split(' '))}`;
     }
   }
 
-  log.success(`\nInitialization complete! 🎉 Ready to deploy "${answers.projectName}".`);
-
   /* ── GitHub Actions CI workflow ───────────────────────────────────── */
   const workflowDir = '.github/workflows';
   const workflowPath = `${workflowDir}/ci.yml`;
@@ -929,6 +927,8 @@ ${pmInstallYaml}${buildStep}${testStep}
       log.success('.github/workflows/ci.yml created ✔');
     }
   }
+
+  log.success(`\nInitialization complete! 🎉 Ready to deploy "${answers.projectName}".`);
 }
 
 export default init;
