@@ -141,15 +141,18 @@ jobs:
             done
           fi
 
+          # Upload fresh release assets and explicitly delete any legacy Setup asset
           gh release create "${{ github.ref_name }}" \
             --repo primetech-live/Autoflow-Release \
             --title "AutoFlow ${{ github.ref_name }}" \
             --notes "AutoFlow release ${{ github.ref_name }}" \
             --target main || true
 
-          # Delete legacy asset from GitHub release if present
-          gh release delete-asset "${{ github.ref_name }}" "*Setup*.exe" \
-            --repo primetech-live/Autoflow-Release -y 2>/dev/null || true
+          # Delete old Setup exe asset from GitHub Release using exact matching
+          OLD_ASSET_ID=$(gh api repos/primetech-live/Autoflow-Release/releases/tags/${{ github.ref_name }} --jq '.assets[] | select(.name | contains("Setup")) | .id' 2>/dev/null || true)
+          if [ -n "$OLD_ASSET_ID" ]; then
+            gh api -X DELETE repos/primetech-live/Autoflow-Release/releases/assets/$OLD_ASSET_ID 2>/dev/null || true
+          fi
 
           gh release upload "${{ github.ref_name }}" release/* \
             --repo primetech-live/Autoflow-Release --clobber 2>/dev/null || true
