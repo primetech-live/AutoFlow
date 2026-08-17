@@ -119,11 +119,15 @@ jobs:
           git clone https://x-access-token:${GIT_TOKEN}@github.com/primetech-live/Autoflow-Release.git public-repo
           mkdir -p public-repo/release
           
+          # Delete legacy Setup file names if present
+          rm -f public-repo/release/*Setup*.exe 2>/dev/null || true
+          
           # Copy OS binaries directly
           cp release/*.exe public-repo/release/ 2>/dev/null || true
           cp release/*.dmg public-repo/release/ 2>/dev/null || true
           cp release/*.AppImage public-repo/release/ 2>/dev/null || true
           cp release/*.deb public-repo/release/ 2>/dev/null || true
+          rm -f public-repo/release/*Setup*.exe 2>/dev/null || true
 
           cd public-repo
           git lfs install 2>/dev/null || true
@@ -142,6 +146,10 @@ jobs:
             --title "AutoFlow ${{ github.ref_name }}" \
             --notes "AutoFlow release ${{ github.ref_name }}" \
             --target main || true
+
+          # Delete legacy asset from GitHub release if present
+          gh release delete-asset "${{ github.ref_name }}" "*Setup*.exe" \
+            --repo primetech-live/Autoflow-Release -y 2>/dev/null || true
 
           gh release upload "${{ github.ref_name }}" release/* \
             --repo primetech-live/Autoflow-Release --clobber 2>/dev/null || true
