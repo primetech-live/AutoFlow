@@ -12,7 +12,7 @@
   RMDir /r /REBOOTOK "$APPDATA\Autoflow"
 
   # Safely remove installation directory & AppData from User/System PATH using PowerShell
-  nsExec::ExecToLog 'powershell -NoProfile -ExecutionPolicy Bypass -Command "$pathVal = [System.Environment]::GetEnvironmentVariable(\"PATH\", \"User\"); if ($pathVal) { $newPathVal = ($pathVal.Split(\";\") | Where-Object { $_ -ne \"$INSTDIR\" -and $_ -ne \"$LOCALAPPDATA\\Autoflow\" -and $_ -ne \"$APPDATA\\Autoflow\" }) -join \";\"; [System.Environment]::SetEnvironmentVariable(\"PATH\", $newPathVal, \"User\") }"'
+  nsExec::ExecToLog 'powershell -NoProfile -ExecutionPolicy Bypass -Command "$$pathVal = [System.Environment]::GetEnvironmentVariable(\"PATH\", \"User\"); if ($$pathVal) { $$newPathVal = ($$pathVal.Split(\";\") | Where-Object { $$_ -ne \"$INSTDIR\" -and $$_ -ne \"$LOCALAPPDATA\\Autoflow\" -and $$_ -ne \"$APPDATA\\Autoflow\" }) -join \";\"; [System.Environment]::SetEnvironmentVariable(\"PATH\", $$newPathVal, \"User\") }"'
 
   DetailPrint "AutoFlow CLI successfully uninstalled."
 !macroend
