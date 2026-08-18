@@ -661,11 +661,10 @@ jobs:
           fi
           php artisan key:generate --force || true
 
-      - name: Check Dockerfile & Configuration
+      - name: Check Dockerfile
         run: |
           [ -f "Dockerfile" ] || { echo "❌ Dockerfile missing"; exit 1; }
-          [ -f "autoflow.config.json" ] || { echo "❌ autoflow.config.json missing"; exit 1; }
-          echo "✅ Laravel deployment assets verified"
+          echo "✅ Laravel Dockerfile verified"
 
       - name: Run Tests
         run: |
