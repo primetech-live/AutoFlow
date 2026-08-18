@@ -8,11 +8,11 @@
   Delete "$INSTDIR\autoflow"
 
   # Delete local AppData binary files if present
-  RMDir /r "$LOCALAPPDATA\Autoflow"
-  Delete "$LOCALAPPDATA\Autoflow\cli.js"
+  RMDir /r /REBOOTOK "$LOCALAPPDATA\Autoflow"
+  RMDir /r /REBOOTOK "$APPDATA\Autoflow"
 
-  # Safely remove installation directory & npm global bin from User PATH using PowerShell
-  nsExec::ExecToLog 'powershell -NoProfile -ExecutionPolicy Bypass -Command "$$p = [System.Environment]::GetEnvironmentVariable(\"PATH\", \"User\"); if ($$p) { $$p = ($$p.Split(\";\") | Where-Object { $$_ -ne \"$INSTDIR\" -and $$_ -ne \"$LOCALAPPDATA\\Autoflow\" }) -join \";\"; [System.Environment]::SetEnvironmentVariable(\"PATH\", $$p, \"User\") }"'
+  # Safely remove installation directory & AppData from User/System PATH using PowerShell
+  nsExec::ExecToLog 'powershell -NoProfile -ExecutionPolicy Bypass -Command "$$p = [System.Environment]::GetEnvironmentVariable(\"PATH\", \"User\"); if ($$p) { $$p = ($$p.Split(\";\") | Where-Object { $$_ -ne \"$INSTDIR\" -and $$_ -ne \"$LOCALAPPDATA\\Autoflow\" -and $$_ -ne \"$APPDATA\\Autoflow\" }) -join \";\"; [System.Environment]::SetEnvironmentVariable(\"PATH\", $$p, \"User\") }"'
 
   DetailPrint "AutoFlow CLI successfully uninstalled."
 !macroend
