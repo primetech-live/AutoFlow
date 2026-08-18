@@ -83,15 +83,13 @@
         "AppImage",
         "deb"
       ],
-      "category": "Development",
-      "afterInstall": "scripts/after-install-linux.sh"
+      "category": "Development"
     },
     "dmg": {
       "sign": false
     },
     "deb": {
-      "afterInstall": "build/postinst",
-      "afterRemove": "build/postrm"
+      "afterInstall": "scripts/after-install-linux.sh"
     }
   },
   "engines": {
