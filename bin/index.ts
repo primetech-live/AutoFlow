@@ -96,5 +96,5 @@ if (isBareCommand) {
     }, 400);
 } else {
     printStaticMascot();
-    program.parse(process.argv);
+    program.parseAsync(process.argv);
 }
