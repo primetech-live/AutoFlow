@@ -1,4 +1,4 @@
-import inquirer from 'inquirer';
+import { readConsole } from '../utils/readConsole';
 import fs from 'fs';
 import log from '../utils/logger';
 import { saveProjectConfig, loadGlobalConfig } from '../core/config';
@@ -16,46 +16,32 @@ async function init(): Promise<void> {
     return;
   }
 
-  const answers = await inquirer.prompt<{
-    projectName: string;
-    gitRepo: string;
-    domain: string;
-    branch: string;
-    strictCI: boolean;
-  }>([
-    {
-      type: 'input',
-      name: 'projectName',
-      message: 'Project name:',
-      default: path.basename(process.cwd()).toLowerCase().replace(/\s+/g, '-'),
-      validate: (input) => {
-        if (!/^[a-z0-9-]+$/i.test(input)) {
-          return 'Project name can only contain alphanumeric characters and dashes.';
-        }
-        return true;
-      }
-    },
-    { type: 'input', name: 'gitRepo', message: 'GitHub repository URL:' },
-    { type: 'input', name: 'domain', message: 'Domain / Subdomain (leave empty for IP:PORT mode):' },
-    { type: 'input', name: 'branch', message: 'Git Branch to deploy:', default: 'main' },
-    {
-      type: 'confirm',
-      name: 'strictCI',
-      message: 'Enable Strict CI? (Fails deployment if tests are missing or placeholders)',
-      default: true,
-    },
-  ]);
+  const defaultProjectName = path.basename(process.cwd()).toLowerCase().replace(/\s+/g, '-');
+  let projectName = await readConsole(`? Project name: (${defaultProjectName})`);
+  if (!projectName) projectName = defaultProjectName;
+
+  while (!/^[a-z0-9-]+$/i.test(projectName)) {
+    log.warning('Project name can only contain alphanumeric characters and dashes.');
+    projectName = await readConsole(`? Project name: (${defaultProjectName})`);
+    if (!projectName) projectName = defaultProjectName;
+  }
+
+  const gitRepo = await readConsole('? GitHub repository URL:');
+  const domain = await readConsole('? Domain / Subdomain (leave empty for IP:PORT mode):');
+  
+  let branch = await readConsole('? Git Branch to deploy: (main)');
+  if (!branch) branch = 'main';
+
+  const strictAns = await readConsole('? Enable Strict CI? (Y/n):');
+  const strictCI = strictAns.toLowerCase() !== 'n';
+
+  const answers = { projectName, gitRepo, domain, branch, strictCI };
 
   try {
     spawnSync('git', ['ls-remote', answers.gitRepo], { stdio: 'ignore' });
   } catch (e) {
     log.warning('\nPrivate repository detected (authentication required).');
-    const { pat } = await inquirer.prompt<{ pat: string }>([{
-      type: 'password',
-      name: 'pat',
-      message: 'Enter a Personal Access Token (PAT) for Git (leave empty to configure later):',
-      mask: '*'
-    }]);
+    const pat = await readConsole('? Enter a Personal Access Token (PAT) for Git (leave empty to configure later):', true);
 
     if (pat) {
       let vault = loadVaultConfig();
