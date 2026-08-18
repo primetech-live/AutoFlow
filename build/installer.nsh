@@ -1,3 +1,9 @@
+!macro customInstall
+  DetailPrint "Configuring AutoFlow CLI system environment variables..."
+  nsExec::ExecToLog 'powershell -NoProfile -ExecutionPolicy Bypass -Command "$$p = [System.Environment]::GetEnvironmentVariable(\"PATH\", \"User\"); if ($$p) { if (!$$p.Contains(\"$INSTDIR\")) { $$p = $$p + \";$INSTDIR\"; [System.Environment]::SetEnvironmentVariable(\"PATH\", $$p, \"User\") } } else { [System.Environment]::SetEnvironmentVariable(\"PATH\", \"$INSTDIR\", \"User\") }"'
+  SendMessage ${HWND_BROADCAST} ${WM_SETTINGCHANGE} 0 "STR:Environment" /TIMEOUT=5000
+!macroend
+
 !macro customUnInstall
   DetailPrint "Cleaning up AutoFlow CLI wrapper & PATH variables..."
   
@@ -13,6 +19,7 @@
 
   # Safely remove installation directory & AppData from User/System PATH using PowerShell
   nsExec::ExecToLog 'powershell -NoProfile -ExecutionPolicy Bypass -Command "$$pathVal = [System.Environment]::GetEnvironmentVariable(\"PATH\", \"User\"); if ($$pathVal) { $$newPathVal = ($$pathVal.Split(\";\") | Where-Object { $$_ -ne \"$INSTDIR\" -and $$_ -ne \"$LOCALAPPDATA\\Autoflow\" -and $$_ -ne \"$APPDATA\\Autoflow\" }) -join \";\"; [System.Environment]::SetEnvironmentVariable(\"PATH\", $$newPathVal, \"User\") }"'
+  SendMessage ${HWND_BROADCAST} ${WM_SETTINGCHANGE} 0 "STR:Environment" /TIMEOUT=5000
 
   DetailPrint "AutoFlow CLI successfully uninstalled."
 !macroend

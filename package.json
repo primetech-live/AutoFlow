@@ -44,6 +44,16 @@
         "filter": ["*"]
       }
     ],
+    "extraFiles": [
+      {
+        "from": "autoflow.cmd",
+        "to": "."
+      },
+      {
+        "from": "autoflow",
+        "to": "."
+      }
+    ],
     "win": {
       "target": "nsis",
       "icon": "build/icon-1.png",
@@ -68,15 +78,16 @@
       "hardenedRuntime": true,
       "gatekeeperAssess": false
     },
-    "dmg": {
-      "sign": false
-    },
     "linux": {
       "target": [
         "AppImage",
         "deb"
       ],
-      "category": "Utility"
+      "category": "Development",
+      "afterInstall": "scripts/after-install-linux.sh"
+    },
+    "dmg": {
+      "sign": false
     },
     "deb": {
       "afterInstall": "build/postinst",
