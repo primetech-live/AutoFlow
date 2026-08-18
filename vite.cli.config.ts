@@ -17,15 +17,19 @@ export default defineConfig({
         entryFileNames: 'cli.js',
         inlineDynamicImports: true
       },
-      // Only exclude native built-in node core modules
-      external: [
-        'child_process', 'crypto', 'events', 'fs', 'os', 'path', 'readline',
-        'http', 'https', 'tls', 'net', 'dns', 'stream', 'util', 'zlib', 'assert', 'tty', 'url',
-        'node:buffer', 'node:path', 'node:events', 'node:child_process', 'node:fs', 'node:process'
-      ]
+      external: (id) => {
+        // Exclude Node core modules & C++ native binary addon files (.node)
+        if (id.endsWith('.node') || id.includes('cpu-features')) return true;
+        const builtins = [
+          'child_process', 'crypto', 'events', 'fs', 'os', 'path', 'readline',
+          'http', 'https', 'tls', 'net', 'dns', 'stream', 'util', 'zlib', 'assert', 'tty', 'url',
+          'node:buffer', 'node:path', 'node:events', 'node:child_process', 'node:fs', 'node:process'
+        ];
+        return builtins.includes(id);
+      }
     }
   },
   ssr: {
-    noExternal: true
+    noExternal: /^(?!.*\.node$).*/
   }
 });
