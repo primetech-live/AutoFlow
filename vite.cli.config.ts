@@ -17,17 +17,15 @@ export default defineConfig({
         entryFileNames: 'cli.js',
         inlineDynamicImports: true
       },
-      // Only exclude built-in node modules and C++ binary addons
+      // Only exclude native built-in node core modules
       external: [
         'child_process', 'crypto', 'events', 'fs', 'os', 'path', 'readline',
         'http', 'https', 'tls', 'net', 'dns', 'stream', 'util', 'zlib', 'assert', 'tty', 'url',
-        'node:buffer', 'node:path', 'node:events', 'node:child_process', 'node:fs', 'node:process',
-        'ssh2', 'cpu-features'
+        'node:buffer', 'node:path', 'node:events', 'node:child_process', 'node:fs', 'node:process'
       ]
     }
   },
   ssr: {
-    noExternal: true,
-    external: ['ssh2', 'cpu-features']
+    noExternal: true
   }
 });
