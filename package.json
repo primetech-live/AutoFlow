@@ -4,12 +4,12 @@
   "description": "Automated CI/CD CLI tool for students and beginners",
   "main": "dist/src/main/index.js",
   "bin": {
-    "autoflow": "./dist/bin/index.js"
+    "autoflow": "./dist/cli.js"
   },
   "scripts": {
     "build:cli": "vite build -c vite.cli.config.ts",
-    "build:binary": "npm run build:cli && npx @yao-pkg/pkg dist/cli.js --target node18-win-x64,node18-linux-x64,node18-macos-x64 --out-path dist/bin",
-    "build": "npm run build:cli && npm run build:ui && tsc && node scripts/copy-assets.js",
+    "build:binary": "npx -y @yao-pkg/pkg dist/cli.js --targets node18-win-x64,node18-linux-x64,node18-macos-x64 --out-path dist/bin",
+    "build": "npm run build:cli && npm run build:binary && npm run build:ui && tsc && node scripts/copy-assets.js",
     "build:ui": "vite build",
     "start": "electron .",
     "dev:ui": "vite",
@@ -36,6 +36,13 @@
     "files": [
       "dist",
       "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "dist/bin",
+        "to": "bin",
+        "filter": ["*"]
+      }
     ],
     "win": {
       "target": "nsis",
