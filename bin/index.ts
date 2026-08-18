@@ -71,7 +71,7 @@ program
 program
     .command('stop')
     .description('Stop the running application on the server')
-    .action(stop);
+    .action(() => stop(false));
 
 const isBareCommand = !process.argv.slice(2).length;
 
