@@ -8,7 +8,7 @@
   },
   "scripts": {
     "build:cli": "vite build -c vite.cli.config.ts",
-    "build:binary": "npx -y @yao-pkg/pkg dist/cli.js --targets node18-win-x64,node18-linux-x64,node18-macos-x64 --out-path dist/bin",
+    "build:binary": "npx -y @yao-pkg/pkg dist/cli.js --targets host --out-path dist/bin",
     "build": "npm run build:cli && npm run build:binary && npm run build:ui && tsc && node scripts/copy-assets.js",
     "build:ui": "vite build",
     "start": "electron .",
