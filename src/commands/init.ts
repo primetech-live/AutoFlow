@@ -1,10 +1,10 @@
-import { readConsole } from '../utils/readConsole';
 import fs from 'fs';
 import log from '../utils/logger';
 import { saveProjectConfig, loadGlobalConfig } from '../core/config';
 import path from 'path';
 import { execSync, spawnSync } from 'child_process';
 import { loadVaultConfig, saveVaultConfig, vaultEngine } from '../core/vault';
+import { promptConsole } from '../utils/console';
 
 async function init(): Promise<void> {
   log.header('AUTOFLOW INITIALIZATION');
@@ -17,31 +17,30 @@ async function init(): Promise<void> {
   }
 
   const defaultProjectName = path.basename(process.cwd()).toLowerCase().replace(/\s+/g, '-');
-  let projectName = await readConsole(`? Project name: (${defaultProjectName})`);
-  if (!projectName) projectName = defaultProjectName;
+  const projNameInput = await promptConsole(`? Project name (${defaultProjectName}): `);
+  const projectName = projNameInput || defaultProjectName;
 
-  while (!/^[a-z0-9-]+$/i.test(projectName)) {
-    log.warning('Project name can only contain alphanumeric characters and dashes.');
-    projectName = await readConsole(`? Project name: (${defaultProjectName})`);
-    if (!projectName) projectName = defaultProjectName;
-  }
+  const gitRepo = await promptConsole('? GitHub repository URL: ');
+  const domain = await promptConsole('? Domain / Subdomain (leave empty for IP:PORT mode): ');
+  const branchInput = await promptConsole('? Git Branch to deploy (main): ');
+  const branch = branchInput || 'main';
 
-  const gitRepo = await readConsole('? GitHub repository URL:');
-  const domain = await readConsole('? Domain / Subdomain (leave empty for IP:PORT mode):');
-  
-  let branch = await readConsole('? Git Branch to deploy: (main)');
-  if (!branch) branch = 'main';
+  const strictCIInput = await promptConsole('? Enable Strict CI? (Y/n): ');
+  const strictCI = !strictCIInput || strictCIInput.toLowerCase().startsWith('y');
 
-  const strictAns = await readConsole('? Enable Strict CI? (Y/n):');
-  const strictCI = strictAns.toLowerCase() !== 'n';
-
-  const answers = { projectName, gitRepo, domain, branch, strictCI };
+  const answers = {
+    projectName,
+    gitRepo,
+    domain,
+    branch,
+    strictCI
+  };
 
   try {
     spawnSync('git', ['ls-remote', answers.gitRepo], { stdio: 'ignore' });
   } catch (e) {
     log.warning('\nPrivate repository detected (authentication required).');
-    const pat = await readConsole('? Enter a Personal Access Token (PAT) for Git (leave empty to configure later):', true);
+    const pat = await promptConsole('? Enter a Personal Access Token (PAT) for Git (leave empty to configure later): ', true);
 
     if (pat) {
       let vault = loadVaultConfig();
@@ -49,17 +48,8 @@ async function init(): Promise<void> {
         log.warning('Vault not set up. Run "autoflow setup-vault" first to securely store Git tokens.');
       } else {
         log.header('Z+ SECURITY CHALLENGE');
-        const { password } = await inquirer.prompt([{
-            type: 'password',
-            name: 'password',
-            message: 'Enter Master Deployment Password to encrypt token:',
-            mask: '*'
-        }]);
-        const { token } = await inquirer.prompt([{
-            type: 'input',
-            name: 'token',
-            message: 'Enter 6-digit OTP from your phone:',
-        }]);
+        const password = await promptConsole('? Enter Master Deployment Password to encrypt token: ', true);
+        const token = await promptConsole('? Enter 6-digit OTP from your phone: ');
 
         if (vaultEngine.unlock(password, token)) {
             if (!vault.projectTokens) vault.projectTokens = {};
@@ -232,12 +222,8 @@ async function init(): Promise<void> {
 
     if (suggestedVolumes.length > 0) {
       log.info(`\n💾 Persistence: AutoFlow detected possible data paths: ${suggestedVolumes.join(', ')}`);
-      const { useVolumes } = await inquirer.prompt<{ useVolumes: boolean }>({
-        type: 'confirm',
-        name: 'useVolumes',
-        message: 'Enable persistent volumes for these paths? (Recommended for databases)',
-        default: true,
-      });
+      const volInput = await promptConsole('? Enable persistent volumes for these paths? (Recommended for databases) (Y/n): ');
+      const useVolumes = !volInput || volInput.toLowerCase().startsWith('y');
       if (useVolumes) {
         volumes = suggestedVolumes;
       }

@@ -1,4 +1,3 @@
-import inquirer from 'inquirer';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -8,6 +7,7 @@ import qrcode from 'qrcode-terminal';
 import log from '../utils/logger';
 import { saveGlobalConfig, GlobalConfig } from '../core/config';
 import { saveVaultConfig, hashPassword, loadVaultConfig, encryptWithPassword, decryptWithPassword, deleteVault, verifyOTP } from '../core/vault';
+import { promptConsole } from '../utils/console';
 
 async function setup(): Promise<void> {
     log.header('AUTOFLOW GLOBAL CONFIGURATION');
@@ -25,41 +25,30 @@ async function setup(): Promise<void> {
         }
     }
 
-    const answers = await inquirer.prompt<GlobalConfig>([
-        {
-            type: 'input',
-            name: 'serverIp',
-            message: 'Server Public IP:',
-            default: existingConfig.serverIp,
-            validate: (val: string) => val ? true : 'Server IP is required',
-        },
-        {
-            type: 'input',
-            name: 'sshUser',
-            message: 'SSH Username:',
-            default: existingConfig.sshUser || 'ubuntu',
-        },
-        {
-            type: 'input',
-            name: 'sshPort',
-            message: 'SSH Port:',
-            default: existingConfig.sshPort || '22',
-        },
-        {
-            type: 'input',
-            name: 'sshKeyPath',
-            message: 'Absolute Path to Private SSH Key:',
-            default: existingConfig.sshKeyPath || path.join(os.homedir(), '.ssh', 'id_rsa'),
-            validate: (val: string) =>
-                fs.existsSync(val) ? true : `File not found at: ${val}`,
-        },
-        {
-            type: 'input',
-            name: 'workspacePath',
-            message: 'Workspace Directory Path:',
-            default: existingConfig.workspacePath || path.resolve(process.cwd(), '..'),
-        },
-    ]);
+    const serverIpInput = await promptConsole(`? Server Public IP${existingConfig.serverIp ? ` (${existingConfig.serverIp})` : ''}: `);
+    const serverIp = serverIpInput || existingConfig.serverIp || '';
+
+    const sshUserInput = await promptConsole(`? SSH Username (${existingConfig.sshUser || 'ubuntu'}): `);
+    const sshUser = sshUserInput || existingConfig.sshUser || 'ubuntu';
+
+    const sshPortInput = await promptConsole(`? SSH Port (${existingConfig.sshPort || '22'}): `);
+    const sshPort = sshPortInput || existingConfig.sshPort || '22';
+
+    const defaultKeyPath = existingConfig.sshKeyPath || path.join(os.homedir(), '.ssh', 'id_rsa');
+    const sshKeyPathInput = await promptConsole(`? Absolute Path to Private SSH Key (${defaultKeyPath}): `);
+    const sshKeyPath = sshKeyPathInput || defaultKeyPath;
+
+    const defaultWorkspace = existingConfig.workspacePath || path.resolve(process.cwd(), '..');
+    const workspacePathInput = await promptConsole(`? Workspace Directory Path (${defaultWorkspace}): `);
+    const workspacePath = workspacePathInput || defaultWorkspace;
+
+    const answers: GlobalConfig = {
+        serverIp,
+        sshUser,
+        sshPort,
+        sshKeyPath,
+        workspacePath
+    };
 
     saveGlobalConfig(answers);
 
@@ -70,37 +59,12 @@ async function setup(): Promise<void> {
     const existingVault = loadVaultConfig();
 
     if (existingVault) {
-        const { vaultAction } = await inquirer.prompt([{
-            type: 'list',
-            name: 'vaultAction',
-            message: 'Z+ Security Vault already exists. What would you like to do?',
-            choices: [
-                { name: 'Keep current vault settings', value: 'keep' },
-                { name: 'Change Master Password (requires current OTP)', value: 'change_password' },
-                { name: 'Full Reset (Destructive - deletes everything)', value: 'reset' }
-            ]
-        }]);
+        const actionInput = await promptConsole('? Z+ Security Vault exists. [K]eep, [C]hange Password, [R]eset: ');
+        const choice = actionInput.toLowerCase();
 
-        if (vaultAction === 'keep') {
-            log.info('✔ Vault kept as is.');
-            log.info(`\nLocation: ${configPath}`);
-            log.info('You can now run "autoflow init" in any project.');
-            return;
-        }
-
-        if (vaultAction === 'change_password') {
-            const { currentPassword } = await inquirer.prompt([{
-                type: 'password',
-                name: 'currentPassword',
-                message: 'Enter Current Master Password:',
-                mask: '*'
-            }]);
-
-            const { token } = await inquirer.prompt([{
-                type: 'input',
-                name: 'token',
-                message: 'Confirm identity with 6-digit OTP:',
-            }]);
+        if (choice.startsWith('c')) {
+            const currentPassword = await promptConsole('? Enter Current Master Password: ', true);
+            const token = await promptConsole('? Confirm identity with 6-digit OTP: ');
 
             let decryptedSecret = '';
             try {
@@ -112,12 +76,7 @@ async function setup(): Promise<void> {
                 return;
             }
 
-            const { newPassword } = await inquirer.prompt([{
-                type: 'password',
-                name: 'newPassword',
-                message: 'Enter New Master Password:',
-                mask: '*'
-            }]);
+            const newPassword = await promptConsole('? Enter New Master Password: ', true);
 
             const salt = crypto.randomBytes(16).toString('hex');
             const encryptedSecret = encryptWithPassword(decryptedSecret, newPassword);
@@ -131,15 +90,9 @@ async function setup(): Promise<void> {
             return;
         }
 
-        if (vaultAction === 'reset') {
-            const { confirmReset } = await inquirer.prompt([{
-                type: 'confirm',
-                name: 'confirmReset',
-                message: 'Are you sure? This will delete your master password and OTP secret.',
-                default: false
-            }]);
-            if (confirmReset) {
-                // deleteVault is already imported from ../core/vault
+        if (choice.startsWith('r')) {
+            const confirmInput = await promptConsole('? Are you sure? This will delete master password and OTP secret (y/N): ');
+            if (confirmInput.toLowerCase().startsWith('y')) {
                 deleteVault();
                 log.info('Vault deleted. Starting fresh setup...');
             } else {
@@ -148,20 +101,11 @@ async function setup(): Promise<void> {
         }
     }
 
-    const { setupVault } = await inquirer.prompt([{
-        type: 'confirm',
-        name: 'setupVault',
-        message: 'Enable Z+ Security (Military-Grade Encryption + OTP)?',
-        default: true
-    }]);
+    const setupVaultInput = await promptConsole('? Enable Z+ Security (Military-Grade Encryption + OTP)? (Y/n): ');
+    const setupVault = !setupVaultInput || setupVaultInput.toLowerCase().startsWith('y');
 
     if (setupVault) {
-        const { password } = await inquirer.prompt([{
-            type: 'password',
-            name: 'password',
-            message: 'Set a Master Deployment Password:',
-            mask: '*'
-        }]);
+        const password = await promptConsole('? Set a Master Deployment Password: ', true);
 
         log.info('Generating TOTP Secret...');
         const secret = speakeasy.generateSecret({
@@ -171,11 +115,7 @@ async function setup(): Promise<void> {
         log.info('\nScan this QR code with Google Authenticator or Authy:\n');
         qrcode.generate(secret.otpauth_url || '', { small: true });
 
-        const { token } = await inquirer.prompt([{
-            type: 'input',
-            name: 'token',
-            message: 'Enter the 6-digit code to verify:',
-        }]);
+        const token = await promptConsole('? Enter the 6-digit code to verify: ');
 
         const verified = speakeasy.totp.verify({
             secret: secret.base32,

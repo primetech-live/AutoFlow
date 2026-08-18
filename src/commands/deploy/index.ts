@@ -17,7 +17,7 @@ import { syncEnv, unlockEnvOnServer, cleanupEnv } from './envService';
 import { loadVaultConfig } from '../../core/vault';
 import { vaultEngine } from '../../core/vault';
 import { AutoFlowError, EXIT_CODES, unregisterCleanupHandlers } from './errors';
-import { readConsole } from '../../utils/readConsole';
+import { promptConsole } from '../../utils/console';
 import fs from 'fs';
 import path from 'path';
 
@@ -91,8 +91,8 @@ async function deploy(isDesktop: boolean = false, projectDir: string = process.c
                     throw new AutoFlowError('Vault is locked. Please unlock it in the desktop app first.', EXIT_CODES.CI_FAILED, 'vault');
                 }
                 log.header('Z+ SECURITY CHALLENGE');
-                const password = await readConsole('? Enter Master Deployment Password:', true);
-                const token = await readConsole('? Enter 6-digit OTP from your phone:');
+                const password = await promptConsole('? Enter Master Deployment Password: ', true);
+                const token = await promptConsole('? Enter 6-digit OTP from your phone: ');
 
                 if (!vaultEngine.unlock(password, token)) {
                     throw new AutoFlowError('Invalid Vault credentials.', EXIT_CODES.CI_FAILED, 'vault');
