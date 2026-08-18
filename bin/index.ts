@@ -3,6 +3,14 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 
+// Set process title and terminal window title to autoflow
+try {
+  process.title = 'autoflow';
+  if (process.stdout.isTTY) {
+    process.stdout.write('\x1b]0;autoflow\x07');
+  }
+} catch { /* ignore */ }
+
 import init from '../src/commands/init';
 import deploy from '../src/commands/deploy/index';
 import status from '../src/commands/status';
