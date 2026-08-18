@@ -41,7 +41,7 @@ git remote remove origin || true &&
 git remote add origin ${escapeShellArg(gitRepo)} &&
 git fetch origin &&
 git reset --hard origin/${escapeShellArg(branch)} &&
-git clean -fd
+git clean -fd || true
 ${authCleanup}
 `);
 
