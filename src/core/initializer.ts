@@ -395,7 +395,7 @@ export async function initProjectCore(projectPath: string, options: InitOptions)
     const workflowDir = p('.github/workflows');
     const workflowPath = p('.github/workflows/ci.yml');
 
-    if (!fs.existsSync(workflowPath)) {
+    if (strictCI && !fs.existsSync(workflowPath)) {
         fs.mkdirSync(workflowDir, { recursive: true });
 
         let ciWorkflow = '';
