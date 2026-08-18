@@ -133,12 +133,23 @@ export class VaultEngine extends EventEmitter {
     }
 
     public isUnlocked(): boolean {
-        if (!this.sessionPassword) return false;
-        if (Date.now() - this.lastActivityTimestamp > IDLE_TIMEOUT_MS) {
-            this.lock();
-            return false;
+        if (this.sessionPassword && Date.now() - this.lastActivityTimestamp <= IDLE_TIMEOUT_MS) {
+            return true;
         }
-        return true;
+        // ponytail: 15-min CLI session cache file check
+        const sessionPath = path.join(os.homedir(), '.autoflow', 'session.lock');
+        try {
+            if (fs.existsSync(sessionPath)) {
+                const session = JSON.parse(fs.readFileSync(sessionPath, 'utf-8'));
+                if (session.expiresAt && Date.now() < session.expiresAt && session.password) {
+                    this.sessionPassword = session.password;
+                    this.resetActivity();
+                    return true;
+                }
+            }
+        } catch {}
+        this.lock();
+        return false;
     }
 
     public getSessionPassword(): string | null {
@@ -180,6 +191,11 @@ export class VaultEngine extends EventEmitter {
             this.failedAttempts = 0;
             this.sessionPassword = password;
             this.resetActivity();
+            // ponytail: save 15-min CLI session cache
+            try {
+                const sessionPath = path.join(os.homedir(), '.autoflow', 'session.lock');
+                fs.writeFileSync(sessionPath, JSON.stringify({ password, expiresAt: Date.now() + IDLE_TIMEOUT_MS }), { mode: 0o600 });
+            } catch {}
             this.emit('lock-state-change', false);
             return true;
         }
