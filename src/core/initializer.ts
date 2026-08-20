@@ -141,30 +141,10 @@ export async function initProjectCore(projectPath: string, options: InitOptions)
     /* ── Volume Detection (Persistence) ────────────────────────────── */
     let volumes: string[] = [];
     if (useVolumes) {
-        const suggestedVolumes: string[] = [];
-        const commonDataPaths = ['data', 'database', 'storage', 'uploads'];
-        for (const dataPath of commonDataPaths) {
-            if (dataPath === 'database') {
-                // Only persist /database if SQLite or file-based DB is detected
-                let isSqlite = false;
-                try {
-                    const files = fs.readdirSync(p('database'));
-                    if (files.some(f => f.endsWith('.sqlite') || f.endsWith('.db'))) isSqlite = true;
-                } catch {}
-                if (fs.existsSync(p('.env'))) {
-                    const envContent = fs.readFileSync(p('.env'), 'utf-8');
-                    if (envContent.includes('DB_CONNECTION=sqlite')) isSqlite = true;
-                }
-                if (isSqlite && fs.existsSync(p('database'))) suggestedVolumes.push('/database');
-            } else if (fs.existsSync(p(dataPath))) {
-                suggestedVolumes.push(`/${dataPath}`);
-            }
-        }
         if (appType === 'laravel') {
             volumes = [
                 '/database',
                 '/storage',
-                '/public',
                 '/public/uploads',
                 '/public/assets/uploads'
             ];
@@ -267,13 +247,7 @@ export async function initProjectCore(projectPath: string, options: InitOptions)
                 let providerContent = fs.readFileSync(appProviderPath, 'utf-8');
                 if (!providerContent.includes('forceScheme')) {
                     const snippet = `
-        if (
-            request()->header('x-forwarded-proto') === 'https' ||
-            (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') ||
-            (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ||
-            str_starts_with(config('app.url'), 'https://') ||
-            (request()->server('HTTP_HOST') && !in_array(explode(':', request()->server('HTTP_HOST'))[0], ['127.0.0.1', 'localhost']))
-        ) {
+        if (app()->environment('production', 'staging') || request()->header('x-forwarded-proto') === 'https' || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')) {
             \\Illuminate\\Support\\Facades\\URL::forceScheme('https');
         }
 `;

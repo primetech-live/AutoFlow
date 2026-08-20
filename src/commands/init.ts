@@ -199,7 +199,6 @@ async function init(): Promise<void> {
     volumes = [
       '/database',
       '/storage',
-      '/public',
       '/public/uploads',
       '/public/assets/uploads'
     ];
@@ -343,13 +342,7 @@ exec "$@"
             providerContent = providerContent.replace(/(namespace\s+App\\Providers;)/, `$1\n\nuse Illuminate\\Support\\Facades\\URL;`);
           }
           const snippet = `
-        if (
-            request()->header('x-forwarded-proto') === 'https' ||
-            (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') ||
-            (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ||
-            str_starts_with(config('app.url'), 'https://') ||
-            (request()->server('HTTP_HOST') && !in_array(explode(':', request()->server('HTTP_HOST'))[0], ['127.0.0.1', 'localhost']))
-        ) {
+        if (app()->environment('production', 'staging') || request()->header('x-forwarded-proto') === 'https' || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')) {
             URL::forceScheme('https');
         }
 `;
