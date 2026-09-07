@@ -1,6 +1,6 @@
 import { NodeSSH } from 'node-ssh';
 import log from '../../utils/logger';
-import { AutoFlowError, EXIT_CODES } from './errors';
+import { AutoFlowError, EXIT_CODES, exec } from './errors';
 import { escapeShellArg } from '../../utils/shell';
 
 const ROLLBACK_SUFFIX = '_rollback';
@@ -8,12 +8,13 @@ const ROLLBACK_SUFFIX = '_rollback';
 export async function backupContainer(ssh: NodeSSH, containerName: string): Promise<void> {
     log.info(`Creating rollback snapshot of "${containerName}"...`);
 
-    const checkRunning = await ssh.execCommand(
-        `docker ps --filter ${escapeShellArg(`name=^/${containerName}$`)} --format "{{.Names}}"`
+    // Ponytail / F7: Check docker ps -a so even stopped/crashed containers get a snapshot instead of being destroyed
+    const checkExisting = await ssh.execCommand(
+        `docker ps -a --filter ${escapeShellArg(`name=^/${containerName}$`)} --format "{{.Names}}"`
     );
 
-    if (!checkRunning.stdout.trim()) {
-        log.info('No running container to backup. Fresh deploy.');
+    if (!checkExisting.stdout.trim()) {
+        log.info('No existing container to backup. Fresh deploy.');
         return;
     }
 
@@ -22,11 +23,11 @@ export async function backupContainer(ssh: NodeSSH, containerName: string): Prom
     // Remove any old rollback container first
     await ssh.execCommand(`docker rm -f ${escapeShellArg(rollbackName)} || true`);
 
-    // Rename current container to the rollback slot
-    await ssh.execCommand(`docker rename ${escapeShellArg(containerName)} ${escapeShellArg(rollbackName)}`);
+    // Ponytail / F3: Use exec() so rename failure throws instead of silently logging success
+    await exec(ssh, `docker rename ${escapeShellArg(containerName)} ${escapeShellArg(rollbackName)}`);
     
     // Stop the rollback container so its port is released for the new container
-    await ssh.execCommand(`docker stop ${escapeShellArg(rollbackName)}`);
+    await ssh.execCommand(`docker stop ${escapeShellArg(rollbackName)} || true`);
 
     log.success(`Rollback snapshot ready (stopped): "${rollbackName}" ✔`);
 }

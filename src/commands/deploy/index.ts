@@ -127,39 +127,53 @@ async function deploy(isDesktop: boolean = false, projectDir: string = process.c
             // ── Step 7: Pull code on server ──────────────────────────────────
             await pullCodeOnServer(ssh, remoteProjectDir, config.gitRepo, config.branch, pat);
 
-            // ── Step 8: Rollback — backup current container ──────────────────
-            await backupContainer(ssh, container);
-
-            // ── Step 9: Build Docker image ───────────────────────────────────
+            // ── Step 8: Build Docker image (old container remains online!) ────
             await buildDockerImage(ssh, remoteProjectDir, image);
 
-            // ── Step 9.5: Environment Sync (Z+ Security) ────────────
-            let envUnlocked = false;
+            // ── Step 9: Rollback snapshot — take snapshot just before swap ───
+            await backupContainer(ssh, container);
 
-            if (vault) {
-                const password = await syncEnv(ssh, remoteProjectDir, projectDir);
-                if (password) {
-                    // Unlock is no longer needed on server directly since it's SFTP streamed,
-                    // but we keep it for backward compat or custom setup
-                    await unlockEnvOnServer(ssh, remoteProjectDir, password, vault.salt);
-                    envUnlocked = true;
-                }
-            }
-
-            // ── Step 10: Start new container ─────────────────────────────────
-            await startContainer(ssh, remoteProjectDir, container, image, hostPort, containerPort, !!config.domain, envUnlocked, config.volumes);
-
-            // ── Step 10.5: Cleanup ───────────────────────────────────────────
-            if (envUnlocked) {
-                await cleanupEnv(ssh, remoteProjectDir);
-            }
-
-            // ── Step 11: Health check → confirm or rollback ──────────────────
+            // Ponytail / F2: Widen try block to protect the entire swap & verify window
             try {
-                await verifyContainerHealth(ssh, container);
+                // ── Step 10: Environment Sync & Container Start ──────────────────
+                let envUnlocked = false;
+
+                try {
+                    if (vault) {
+                        const password = await syncEnv(ssh, remoteProjectDir, projectDir);
+                        if (password) {
+                            await unlockEnvOnServer(ssh, remoteProjectDir, password, vault.salt);
+                            envUnlocked = true;
+                        }
+                    }
+
+                    // ── Step 10: Start new container ─────────────────────────────────
+                    await startContainer(ssh, remoteProjectDir, container, image, hostPort, containerPort, !!config.domain, envUnlocked, config.volumes);
+                } finally {
+                    // Ponytail / F8: Plaintext .env is cleaned up even if startContainer throws
+                    if (envUnlocked) {
+                        await cleanupEnv(ssh, remoteProjectDir);
+                    }
+                }
+
+                // ── Step 11: Real Health Check ───────────────────────────────────
+                await verifyContainerHealth(ssh, container, hostPort);
+
+                // ── Step 12 & 13: Nginx + SSL (domain mode only) ─────────────────
+                await configureUFW(ssh, hostPort, !!config.domain, config.sshPort);
+
+                if (config.domain) {
+                    await configureNginx(ssh, config.domain, config.projectName, config.sshUser, hostPort);
+                    await provisionSSL(ssh, config.domain);
+                } else {
+                    log.success(`Live at: http://${config.serverIp}:${hostPort}`);
+                }
+
+                // Ponytail / F6: Confirm deploy and delete _rollback ONLY after network routing succeeds
                 await confirmDeploy(ssh, container);
-            } catch (healthErr) {
-                log.warning('Health check failed. Attempting rollback...');
+
+            } catch (deployErr) {
+                log.warning('Deployment step failed during swap. Attempting rollback...');
                 let rollbackSsh = ssh;
                 try {
                     await ssh.execCommand('echo 1');
@@ -172,17 +186,7 @@ async function deploy(isDesktop: boolean = false, projectDir: string = process.c
                 } finally {
                     if (rollbackSsh !== ssh) try { rollbackSsh.dispose(); } catch {}
                 }
-                throw healthErr;
-            }
-
-            // ── Step 12 & 13: Nginx + SSL (domain mode only) ─────────────────
-            await configureUFW(ssh, hostPort, !!config.domain, config.sshPort);
-
-            if (config.domain) {
-                await configureNginx(ssh, config.domain, config.projectName, config.sshUser, hostPort);
-                await provisionSSL(ssh, config.domain);
-            } else {
-                log.success(`Live at: http://${config.serverIp}:${hostPort}`);
+                throw deployErr;
             }
 
             log.header('DEPLOYMENT COMPLETE 🚀');

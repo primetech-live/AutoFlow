@@ -65,9 +65,50 @@ export async function startContainer(
     await exec(ssh, `cd ${escapeShellArg(projectDir)} && ${runCmd}`);
 }
 
+/**
+ * Probes container HTTP response on localhost mapped port.
+ * Ponytail: reuses curl probe pattern from status.ts:74-78.
+ * Rejects 5xx and 000/empty (unreachable); allows 2xx, 3xx, 401, 403, 404 to avoid false rollbacks.
+ */
+export async function probeContainerHttp(
+    ssh: NodeSSH,
+    containerName: string,
+    hostPort?: string
+): Promise<{ healthy: boolean; code: string }> {
+    let mappedPort = hostPort || '';
+    if (!mappedPort) {
+        const safeContainer = escapeShellArg(containerName);
+        const portCmd = await ssh.execCommand(`docker port ${safeContainer}`);
+        if (portCmd.stdout) {
+            const match = portCmd.stdout.match(/0\.0\.0\.0:(\d+)/) || portCmd.stdout.match(/127\.0\.0\.1:(\d+)/);
+            if (match && match[1]) {
+                mappedPort = match[1];
+            }
+        }
+    }
+
+    if (!mappedPort) {
+        // If container exposes no host port (e.g. pure worker, domain-free, or test mock), fallback to docker status
+        return { healthy: true, code: 'N/A' };
+    }
+
+    const health = await ssh.execCommand(
+        `curl -I -s -o /dev/null -w "%{http_code}" --connect-timeout 3 http://127.0.0.1:${mappedPort} || true`
+    );
+    const httpCode = (health.stdout || '').trim();
+
+    // 000 = curl failed to connect, 5xx = server error
+    if (!httpCode || httpCode === '000' || httpCode.startsWith('5')) {
+        return { healthy: false, code: httpCode || '000' };
+    }
+
+    return { healthy: true, code: httpCode };
+}
+
 export async function verifyContainerHealth(
     ssh: NodeSSH,
-    containerName: string
+    containerName: string,
+    hostPort?: string
 ): Promise<void> {
     log.info('Verifying container health...');
 
@@ -75,6 +116,7 @@ export async function verifyContainerHealth(
     let attempts = 0;
     const maxAttempts = 5;
     const intervalMs = 2000;
+    let lastProbeResult = { healthy: false, code: '' };
 
     while (attempts < maxAttempts) {
         attempts++;
@@ -82,13 +124,25 @@ export async function verifyContainerHealth(
             `docker ps --filter ${escapeShellArg(`name=^/${containerName}$`)} --format "{{.Status}}"`
         );
 
-        if (ps.stdout && ps.stdout.includes('Up')) {
-            isHealthy = true;
-            break;
+        // Must be Up and not reported as (unhealthy) by Docker's internal HEALTHCHECK
+        const status = ps.stdout || '';
+        if (status.includes('Up') && !status.includes('(unhealthy)')) {
+            // Ponytail: Run HTTP check if port is available
+            if (hostPort) {
+                const probe = await probeContainerHttp(ssh, containerName, hostPort);
+                lastProbeResult = probe;
+                if (probe.healthy) {
+                    isHealthy = true;
+                    break;
+                }
+            } else {
+                isHealthy = true;
+                break;
+            }
         }
 
         if (attempts < maxAttempts) {
-            log.info(`  ... Container not ready yet, retrying (${attempts}/${maxAttempts})...`);
+            log.info(`  ... Container initializing (HTTP ${lastProbeResult.code || 'waiting'}), retrying (${attempts}/${maxAttempts})...`);
             await new Promise((resolve) => setTimeout(resolve, intervalMs));
         }
     }
@@ -100,11 +154,11 @@ export async function verifyContainerHealth(
         log.error('======================================\n');
 
         throw new AutoFlowError(
-            `Container "${containerName}" failed to start or exited immediately.`,
+            `Container "${containerName}" failed to start or exited immediately (health check failed, HTTP status: ${lastProbeResult.code || 'Down'}).`,
             EXIT_CODES.CONTAINER_FAILED,
             'containerService'
         );
     }
 
-    log.success(`Container "${containerName}" is running ✔`);
+    log.success(`Container "${containerName}" is healthy (HTTP ${lastProbeResult.code}) ✔`);
 }

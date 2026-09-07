@@ -33,6 +33,19 @@ async function status(): Promise<void> {
 
         if (!containerStatus) {
             console.log(chalk.red('\n❌ APP STATUS: NOT RUNNING (Container not found)'));
+
+            // Ponytail / F11: Check if a rollback container exists from an interrupted or failed deploy
+            const rollbackInspect = await ssh.execCommand(
+                `docker inspect --format '{{.State.Status}}' ${escapeShellArg(container + '_rollback')}`
+            );
+            const rbStatus = rollbackInspect.stdout.trim();
+            if (rbStatus) {
+                console.log(chalk.yellow(`\n⚠️  Rollback snapshot found: "${container}_rollback" (Status: ${rbStatus})`));
+                console.log(chalk.cyan('To restore the previous working version manually, run on server:'));
+                console.log(chalk.gray(`  docker rm -f ${safeContainer}`));
+                console.log(chalk.gray(`  docker rename ${safeContainer}_rollback ${safeContainer}`));
+                console.log(chalk.gray(`  docker start ${safeContainer}\n`));
+            }
             return;
         }
 

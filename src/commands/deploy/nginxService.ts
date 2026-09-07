@@ -71,9 +71,10 @@ server {
 
             if (isConflict) {
                 log.warning(`Found conflicting config: ${conflictName}. Backing up and removing...`);
-                await exec(ssh, `sudo cp ${conflict} /home/${sshUser}/backup-${conflictName}.conf || true`);
-                await exec(ssh, `sudo rm -f ${conflict}`);
-                await exec(ssh, `sudo rm -f /etc/nginx/sites-available/${conflictName}`);
+                // Ponytail / F13: escape shell arguments
+                await exec(ssh, `sudo cp ${escapeShellArg(conflict)} /home/${escapeShellArg(sshUser)}/backup-${escapeShellArg(conflictName)}.conf || true`);
+                await exec(ssh, `sudo rm -f ${escapeShellArg(conflict)}`);
+                await exec(ssh, `sudo rm -f /etc/nginx/sites-available/${escapeShellArg(conflictName)}`);
                 log.success(`Removed conflict: ${conflictName} (backup kept)`);
             } else {
                 log.info(`Ignoring false positive: ${conflictName}`);
@@ -81,10 +82,16 @@ server {
         }
     }
 
+    const enabledPath = `/etc/nginx/sites-enabled/${safeProjectName}`;
+    const backupPath = `/etc/nginx/sites-available/${safeProjectName}.bak`;
+
+    // Ponytail / F5: Backup existing config if one already exists before writing candidate
+    await ssh.execCommand(`sudo test -f ${confPath} && sudo cp ${confPath} ${backupPath} || true`);
+
     await exec(ssh, `cat <<'NGINX_EOF' | sudo tee ${confPath} > /dev/null
 ${nginxConf}
 NGINX_EOF`);
-    await exec(ssh, `sudo ln -sf ${confPath} /etc/nginx/sites-enabled/${safeProjectName}`);
+    await exec(ssh, `sudo ln -sf ${confPath} ${enabledPath}`);
 
     // Update port in case SSL config already exists
     await exec(
@@ -95,12 +102,26 @@ NGINX_EOF`);
     // Test config
     const test = await ssh.execCommand('sudo nginx -t 2>&1');
     if (test.code !== 0) {
+        // Ponytail / F5: Clean up candidate symlink to avoid breaking whole server for all projects!
+        await ssh.execCommand(`sudo rm -f ${enabledPath}`);
+        // Restore previous backup if existed
+        const hasBackup = await ssh.execCommand(`sudo test -f ${backupPath} && echo "YES" || echo "NO"`);
+        if (hasBackup.stdout.trim() === 'YES') {
+            await ssh.execCommand(`sudo cp ${backupPath} ${confPath} && sudo ln -sf ${confPath} ${enabledPath} || true`);
+            await ssh.execCommand(`sudo rm -f ${backupPath}`);
+        } else {
+            await ssh.execCommand(`sudo rm -f ${confPath}`);
+        }
+
         throw new AutoFlowError(
-            `Nginx config test failed:\n${test.stdout}\n${test.stderr}`,
+            `Nginx config test failed (candidate config removed to preserve server stability):\n${test.stdout}\n${test.stderr}`,
             EXIT_CODES.NGINX_FAILED,
             'nginxService'
         );
     }
+
+    // Candidate passed, remove temp backup
+    await ssh.execCommand(`sudo rm -f ${backupPath} || true`);
 
     await exec(ssh, 'sudo systemctl reload nginx');
 
@@ -155,6 +176,8 @@ server {
     
     // Only unlink default if it's unmanaged and contains no custom tools like phpMyAdmin
     if (defaultContent && !defaultContent.includes('phpmyadmin') && !defaultContent.includes('location /phpmyadmin')) {
+        // Ponytail / F12: Backup default config before removing
+        await ssh.execCommand('sudo cp /etc/nginx/sites-enabled/default /etc/nginx/sites-available/default.bak 2>/dev/null || true');
         await ssh.execCommand('sudo rm -f /etc/nginx/sites-enabled/default');
     }
 
