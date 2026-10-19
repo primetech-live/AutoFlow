@@ -63,8 +63,8 @@
       "artifactName": "Autoflow-vNext_v${version}.${ext}"
     },
     "appx": {
-      "applicationId": "PrimetechDigitalSolutions.Autoflow-vNext",
-      "identityName": "PrimetechDigitalSolutions.Autoflow-vNext",
+      "applicationId": "AutoflowVNext",
+      "identityName": "PrimetechDigitalSolutions.AutoflowVNext",
       "publisherDisplayName": "Primetech Digital Solutions",
       "artifactName": "Autoflow-vNext_v${version}.${ext}"
     },
