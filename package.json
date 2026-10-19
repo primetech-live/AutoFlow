@@ -55,8 +55,17 @@
       }
     ],
     "win": {
-      "target": "nsis",
+      "target": [
+        "nsis",
+        "appx"
+      ],
       "icon": "build/icon-1.png",
+      "artifactName": "Autoflow-vNext_v${version}.${ext}"
+    },
+    "appx": {
+      "applicationId": "PrimetechDigitalSolutions.Autoflow-vNext",
+      "identityName": "PrimetechDigitalSolutions.Autoflow-vNext",
+      "publisherDisplayName": "Primetech Digital Solutions",
       "artifactName": "Autoflow-vNext_v${version}.${ext}"
     },
     "nsis": {

@@ -124,6 +124,8 @@ jobs:
           
           # Copy OS binaries directly
           cp release/*.exe public-repo/release/ 2>/dev/null || true
+          cp release/*.appx public-repo/release/ 2>/dev/null || true
+          cp release/*.msix public-repo/release/ 2>/dev/null || true
           cp release/*.dmg public-repo/release/ 2>/dev/null || true
           cp release/*.AppImage public-repo/release/ 2>/dev/null || true
           cp release/*.deb public-repo/release/ 2>/dev/null || true
