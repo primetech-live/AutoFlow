@@ -65,7 +65,7 @@
     "appx": {
       "applicationId": "AutoflowVNext",
       "identityName": "PrimetechDigitalSolutions.AutoflowVNext",
-      "publisherDisplayName": "Primetech Digital Solutions",
+      "publisherDisplayName": "PrimeTech Digital Soultions",
       "artifactName": "Autoflow-vNext_v${version}.${ext}"
     },
     "nsis": {
