@@ -106,8 +106,8 @@ function createWindow() {
 app.whenReady().then(async () => {
     createWindow();
 
-    // Check for updates
-    if (!isDev) {
+    // Check for updates (active for standard .exe installations; skipped in Microsoft Store AppX builds per Policy 10.2.5)
+    if (!isDev && !process.windowsStore) {
         autoUpdater.checkForUpdatesAndNotify();
     }
 
