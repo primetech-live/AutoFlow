@@ -2,7 +2,9 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-const sourceIcon = path.resolve(__dirname, '../build/icon.png');
+const websiteIcon = 'D:/Autoflow-website/Assets/icon_1080x1080.png';
+const fallbackIcon = path.resolve(__dirname, '../build/icon.png');
+const sourceIcon = fs.existsSync(websiteIcon) ? websiteIcon : fallbackIcon;
 const appxDir = path.resolve(__dirname, '../build/appx');
 
 if (!fs.existsSync(appxDir)) {

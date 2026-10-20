@@ -69,7 +69,6 @@
       "publisherDisplayName": "PrimeTech Digital Soultions",
       "displayName": "AutoFlow",
       "backgroundColor": "#141416",
-      "assets": "build/appx",
       "artifactName": "Autoflow-vNext_v${version}.${ext}"
     },
     "nsis": {
