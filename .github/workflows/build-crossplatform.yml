@@ -132,9 +132,14 @@ jobs:
           rm -f public-repo/release/*Setup*.exe 2>/dev/null || true
 
           cd public-repo
+          # Clean old versions from git tracking so public-repo only retains current version
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          find release -type f ! -name "*${VERSION}*" -delete 2>/dev/null || true
+
           git lfs install 2>/dev/null || true
           git lfs track "release/*" 2>/dev/null || true
-          git add .gitattributes release/ 2>/dev/null || true
+          git add -A .gitattributes release/ 2>/dev/null || true
           
           if ! git diff --cached --quiet; then
             git commit -m "chore: publish ${{ matrix.os }} binaries for ${{ github.ref_name }}"
@@ -142,6 +147,8 @@ jobs:
               git fetch origin main && git rebase origin/main && git push origin main && break || sleep 5
             done
           fi
+
+          cd ..
 
           # Upload fresh release assets and explicitly delete any legacy Setup asset
           gh release create "${{ github.ref_name }}" \
@@ -156,6 +163,7 @@ jobs:
             gh api -X DELETE repos/primetech-live/Autoflow-Release/releases/assets/$OLD_ASSET_ID 2>/dev/null || true
           fi
 
+          # Only upload newly built assets from this run's release/ folder
           gh release upload "${{ github.ref_name }}" release/* \
             --repo primetech-live/Autoflow-Release --clobber 2>/dev/null || true
 
