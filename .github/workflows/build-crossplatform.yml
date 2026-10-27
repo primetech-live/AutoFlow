@@ -108,6 +108,30 @@ jobs:
           mkdir -p release
           npm run dist -- ${{ matrix.target_flag }} -p never
 
+      # ── PUBLISH DIRECTLY TO MICROSOFT STORE (WINDOWS RUNNER ONLY) ─────────────
+      - name: Setup Microsoft Store CLI
+        if: matrix.os == 'windows-latest'
+        uses: microsoft/microsoft-store-apppublisher@v1
+
+      - name: Auto-Publish Package to Microsoft Store
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        env:
+          TENANT_ID: ${{ secrets.MS_STORE_TENANT_ID }}
+          CLIENT_ID: ${{ secrets.MS_STORE_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.MS_STORE_CLIENT_SECRET }}
+          PRODUCT_ID: ${{ secrets.MS_STORE_PRODUCT_ID }}
+        run: |
+          msstore reconfigure --tenantId "$env:TENANT_ID" --clientId "$env:CLIENT_ID" --clientSecret "$env:CLIENT_SECRET"
+          $appxFile = (Get-ChildItem -Path release -Filter "*.appx" | Select-Object -First 1).FullName
+          if ($appxFile) {
+            Write-Host "Publishing $appxFile to Microsoft Store ($env:PRODUCT_ID)..."
+            msstore submission update $env:PRODUCT_ID --packages "$appxFile" --publish
+            Write-Host "Successfully submitted update to Microsoft Store!"
+          } else {
+            Write-Warning "No .appx package found in release directory to publish."
+          }
+
       - name: Direct Publish Executables to Autoflow-Release Repo
         shell: bash
         env:
@@ -122,10 +146,8 @@ jobs:
           # Delete legacy Setup file names if present
           rm -f public-repo/release/*Setup*.exe 2>/dev/null || true
           
-          # Copy OS binaries directly
+          # Copy OS binaries directly (appx is published directly to Microsoft Store, not to public repo)
           cp release/*.exe public-repo/release/ 2>/dev/null || true
-          cp release/*.appx public-repo/release/ 2>/dev/null || true
-          cp release/*.msix public-repo/release/ 2>/dev/null || true
           cp release/*.dmg public-repo/release/ 2>/dev/null || true
           cp release/*.AppImage public-repo/release/ 2>/dev/null || true
           cp release/*.deb public-repo/release/ 2>/dev/null || true
@@ -163,8 +185,8 @@ jobs:
             gh api -X DELETE repos/primetech-live/Autoflow-Release/releases/assets/$OLD_ASSET_ID 2>/dev/null || true
           fi
 
-          # Only upload pure installer binaries (exe, appx, dmg, AppImage, deb)
-          for f in release/*.exe release/*.appx release/*.dmg release/*.AppImage release/*.deb; do
+          # Only upload pure installer binaries for website users (exe, dmg, AppImage, deb - no appx)
+          for f in release/*.exe release/*.dmg release/*.AppImage release/*.deb; do
             if [ -f "$f" ]; then
               gh release upload "${{ github.ref_name }}" "$f" \
                 --repo primetech-live/Autoflow-Release --clobber 2>/dev/null || true
