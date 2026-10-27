@@ -117,12 +117,12 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: pwsh
         env:
-          TENANT_ID: ${{ secrets.MS_STORE_TENANT_ID }}
-          CLIENT_ID: ${{ secrets.MS_STORE_CLIENT_ID }}
-          CLIENT_SECRET: ${{ secrets.MS_STORE_CLIENT_SECRET }}
+          MSSTORE_TENANT_ID: ${{ secrets.MS_STORE_TENANT_ID }}
+          MSSTORE_CLIENT_ID: ${{ secrets.MS_STORE_CLIENT_ID }}
+          MSSTORE_CLIENT_SECRET: ${{ secrets.MS_STORE_CLIENT_SECRET }}
+          MSSTORE_SELLER_ID: "96693990"
           PRODUCT_ID: ${{ secrets.MS_STORE_PRODUCT_ID }}
         run: |
-          msstore reconfigure --tenantId "$env:TENANT_ID" --clientId "$env:CLIENT_ID" --clientSecret "$env:CLIENT_SECRET"
           $appxFile = (Get-ChildItem -Path release -Filter "*.appx" | Select-Object -First 1).FullName
           if ($appxFile) {
             Write-Host "Publishing $appxFile to Microsoft Store ($env:PRODUCT_ID)..."
