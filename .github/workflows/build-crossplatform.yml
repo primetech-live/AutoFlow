@@ -117,17 +117,18 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: pwsh
         env:
-          MSSTORE_TENANT_ID: ${{ secrets.MS_STORE_TENANT_ID }}
-          MSSTORE_CLIENT_ID: ${{ secrets.MS_STORE_CLIENT_ID }}
-          MSSTORE_CLIENT_SECRET: ${{ secrets.MS_STORE_CLIENT_SECRET }}
-          MSSTORE_SELLER_ID: "96693990"
+          TENANT_ID: ${{ secrets.MS_STORE_TENANT_ID }}
+          CLIENT_ID: ${{ secrets.MS_STORE_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.MS_STORE_CLIENT_SECRET }}
+          SELLER_ID: "96693990"
           PRODUCT_ID: ${{ secrets.MS_STORE_PRODUCT_ID }}
         run: |
+          echo "y" | msstore reconfigure --tenantId "$env:TENANT_ID" --sellerId "$env:SELLER_ID" --clientId "$env:CLIENT_ID" --clientSecret "$env:CLIENT_SECRET"
           $appxFile = (Get-ChildItem -Path release -Filter "*.appx" | Select-Object -First 1).FullName
           if ($appxFile) {
-            Write-Host "Publishing $appxFile to Microsoft Store ($env:PRODUCT_ID)..."
-            msstore submission update $env:PRODUCT_ID --packages "$appxFile" --publish
-            Write-Host "Successfully submitted update to Microsoft Store!"
+            Write-Host "Publishing $appxFile to Microsoft Store ID: $env:PRODUCT_ID ..."
+            msstore publish "$appxFile" -id "$env:PRODUCT_ID"
+            Write-Host "Successfully published package to Microsoft Store!"
           } else {
             Write-Warning "No .appx package found in release directory to publish."
           }
