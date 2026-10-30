@@ -72,9 +72,9 @@
     },
     "appx": {
       "applicationId": "AutoflowVNext",
-      "identityName": "PrimeTechDigitalSolutions.Autoflow-vNext",
+      "identityName": "PrimeTechDigitalSoultions.Autoflow-vNext",
       "publisher": "CN=71F28B0F-64F5-4016-B586-6048528D061E",
-      "publisherDisplayName": "PrimeTech Digital Solutions",
+      "publisherDisplayName": "PrimeTech Digital Soultions",
       "displayName": "Autoflow-vNext",
       "backgroundColor": "#141416",
       "artifactName": "Autoflow-vNext_v${version}.${ext}"
