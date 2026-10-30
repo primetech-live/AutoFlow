@@ -117,19 +117,31 @@ app.whenReady().then(async () => {
         }
     });
 
+    const extractDeepLinkUrl = (args: string[]): string | undefined => {
+        for (const raw of args) {
+            if (!raw) continue;
+            const cleaned = raw.replace(/^"|"$/g, '').trim();
+            if (cleaned.startsWith('autoflow://')) {
+                return cleaned;
+            }
+        }
+        return undefined;
+    };
+
     app.on('second-instance', (_, commandLine) => {
         if (mainWindow) {
             if (mainWindow.isMinimized()) mainWindow.restore();
             mainWindow.focus();
-            const url = commandLine.find(arg => arg.startsWith('autoflow://'));
+            const url = extractDeepLinkUrl(commandLine);
             if (url) mainWindow.webContents.send('auth:deep-link', url);
         }
     });
 
     app.on('open-url', (event, url) => {
         event.preventDefault();
-        if (mainWindow) {
-            mainWindow.webContents.send('auth:deep-link', url);
+        const cleaned = url ? url.replace(/^"|"$/g, '').trim() : undefined;
+        if (mainWindow && cleaned) {
+            mainWindow.webContents.send('auth:deep-link', cleaned);
         }
     });
 

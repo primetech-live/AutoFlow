@@ -115,6 +115,7 @@ jobs:
 
       - name: Auto-Publish Package to Microsoft Store
         if: matrix.os == 'windows-latest'
+        continue-on-error: true
         shell: pwsh
         env:
           TENANT_ID: ${{ secrets.MS_STORE_TENANT_ID }}

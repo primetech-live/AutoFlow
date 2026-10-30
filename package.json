@@ -1,6 +1,6 @@
 {
   "name": "autoflow-tech",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Automated CI/CD CLI tool for students and beginners",
   "main": "dist/src/main/index.js",
   "bin": {
@@ -23,6 +23,14 @@
   "build": {
     "appId": "com.autoflow.vnext",
     "productName": "Autoflow-vNext",
+    "protocols": [
+      {
+        "name": "Autoflow",
+        "schemes": [
+          "autoflow"
+        ]
+      }
+    ],
     "publish": [
       {
         "provider": "github",

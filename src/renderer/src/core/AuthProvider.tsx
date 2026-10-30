@@ -31,15 +31,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (session) syncSessionWithMain(session);
         });
 
-        const unsubscribeDeepLink = window.autoflow.onAuthDeepLink?.(async (url: string) => {
-            const hash = url.split('#')[1];
-            if (hash) {
-                const params = new URLSearchParams(hash);
-                const access_token = params.get('access_token');
-                const refresh_token = params.get('refresh_token');
-                if (access_token && refresh_token) {
-                    await supabase.auth.setSession({ access_token, refresh_token });
+        const unsubscribeDeepLink = window.autoflow.onAuthDeepLink?.(async (rawUrl: string) => {
+            try {
+                if (!rawUrl) return;
+                const cleanUrl = rawUrl.trim().replace(/^"|"$/g, '');
+
+                // 1. PKCE Authorization Code Exchange (?code=...)
+                let code: string | null = null;
+                if (cleanUrl.includes('?')) {
+                    const queryString = cleanUrl.split('?')[1].split('#')[0];
+                    const searchParams = new URLSearchParams(queryString);
+                    code = searchParams.get('code');
                 }
+
+                if (code) {
+                    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+                    if (error) {
+                        console.error('[Auth] Failed to exchange PKCE code for session:', error.message);
+                    } else if (data?.session) {
+                        setSession(data.session);
+                        setUser(data.session.user ?? null);
+                        await syncSessionWithMain(data.session);
+                    }
+                    return;
+                }
+
+                // 2. Hash Fragment Fallback (#access_token=...&refresh_token=...)
+                if (cleanUrl.includes('#')) {
+                    const hashString = cleanUrl.split('#')[1];
+                    const hashParams = new URLSearchParams(hashString);
+                    const access_token = hashParams.get('access_token');
+                    const refresh_token = hashParams.get('refresh_token');
+                    if (access_token && refresh_token) {
+                        const { data, error } = await supabase.auth.setSession({ access_token, refresh_token });
+                        if (error) {
+                            console.error('[Auth] Failed to set session from hash tokens:', error.message);
+                        } else if (data?.session) {
+                            setSession(data.session);
+                            setUser(data.session.user ?? null);
+                            await syncSessionWithMain(data.session);
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('[Auth] Error handling deep link:', err);
             }
         });
 
